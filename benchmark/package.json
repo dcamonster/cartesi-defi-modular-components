@@ -1,0 +1,20 @@
+{
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "ethers": "^6.8.0",
+    "pg": "^8.11.3",
+    "reflect-metadata": "^0.1.13",
+    "typedi": "^0.10.0",
+    "typeorm": "^0.3.17",
+    "@cartesi/rollups": "1.1.0"
+  },
+  "scripts": {
+    "start": "ts-node src/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.9",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  }
+}

@@ -25,3 +25,8 @@ COPY --from=build-stage /opt/venv /opt/venv
 WORKDIR /opt/cartesi/dapp
 COPY ./entrypoint.sh .
 COPY ./dapp ./dapp
+
+# Init sqlite database
+COPY ./sqlite.py .
+RUN python sqlite.py
+RUN rm sqlite.py

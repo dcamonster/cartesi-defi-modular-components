@@ -1,20 +1,10 @@
-# Copyright 2022 Cartesi Pte. Ltd.
-#
-# SPDX-License-Identifier: Apache-2.0
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use
-# this file except in compliance with the License. You may obtain a copy of the
-# License at http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed
-# under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-# CONDITIONS OF ANY KIND, either express or implied. See the License for the
-# specific language governing permissions and limitations under the License.
-
 import json
 import logging
 from os import environ
-
+from eth_utils import to_checksum_address, is_hex_address
 import requests
+
+ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 
 def hex_to_str(hex):
@@ -49,6 +39,42 @@ handler.setFormatter(JSONFormatter())
 logger.addHandler(handler)
 
 rollup_server = environ.get("ROLLUP_HTTP_SERVER_URL", "http://127.0.0.1:5004")
+
+
+def str_to_int(string):
+    """Converts a string to an integer. Returns 0 if conversion is not possible."""
+    try:
+        return int(float(string))
+    except (TypeError, ValueError):
+        return 0
+
+
+def int_to_str(integer):
+    """Converts an integer to a string. Returns '0' if the input is None or not an integer."""
+    try:
+        return str(int(integer))
+    except (TypeError, ValueError):
+        return "0"
+
+
+def with_checksum_address(func):
+    def wrapper(*args, **kwargs):
+        args = tuple(
+            to_checksum_address(arg) if is_hex_address(arg) else arg for arg in args
+        )
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def apply_decorator_to_all_methods(decorator):
+    def class_decorator(cls):
+        for attr_name, attr_value in cls.__dict__.items():
+            if callable(attr_value):
+                setattr(cls, attr_name, decorator(attr_value))
+        return cls
+
+    return class_decorator
 
 
 class NoticeBuffer:

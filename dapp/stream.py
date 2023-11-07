@@ -1,22 +1,34 @@
+from typing import Optional
+
 class Stream:
-    def __init__(self, id):
-        self.qty_in = qty_in
-        self.blocks_lifespan = blocks_lifespan
-        self.qty_in_per_block = qty_in / blocks_lifespan
+    def __init__(
+        self,
+        stream_id: int,
+        from_address: str,
+        to_address: str,
+        start_block: int,
+        block_duration: int,
+        amount: int,
+        token_address: str,
+        pair_address: Optional[str] = None,
+    ):
+        self.id = stream_id
+        self.from_address = from_address
+        self.to_address = to_address
+        self.start_block = start_block
+        self.block_duration = block_duration
+        self.amount = amount
+        self.token_address = token_address
+        self.pair_address = pair_address
 
-        # Ongoing stats
-        self.blocks_left = blocks_lifespan
-        self.qty_filled = 0
+    def is_live(self, current_block: int) -> bool:
+        return current_block < self.start_block + self.block_duration
 
-    def update_after_fill(self, qty_filled):
-        assert self.is_live()
+    def streamed_amount(self, at_block: int) -> int:
+        if at_block < self.start_block:
+            return 0
+        if at_block >= self.start_block + self.block_duration:
+            return self.amount
 
-        self.qty_filled += qty_filled
-        self.blocks_left -= 1
-
-    def qty_spent(self):
-        blocks_in = self.blocks_lifespan - self.blocks_left
-        return blocks_in / self.blocks_lifespan * self.qty_in
-
-    def is_live(self):
-        return self.blocks_left > 0
+        elapsed = at_block - self.start_block
+        return (self.amount * elapsed) // self.block_duration
