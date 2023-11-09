@@ -7,7 +7,7 @@ from dapp.util import (
     logger,
     rollup_server,
 )
-from dapp.request_handler import handle
+from dapp.core import handle
 
 network = environ.get("NETWORK", "localhost")
 ERC20PortalFile = open(f"./deployments/{network}/ERC20Portal.json")

@@ -13,9 +13,9 @@ from dapp.db import (
 )
 from dapp.stream import Stream
 from dapp.util import (
+    ZERO_ADDRESS,
     apply_decorator_to_all_methods,
     with_checksum_address,
-    ZERO_ADDRESS,
 )
 
 

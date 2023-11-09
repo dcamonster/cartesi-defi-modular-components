@@ -6,24 +6,12 @@ import requests
 from eth_abi.abi import encode
 
 from dapp.db import get_connection
-from dapp.eth_abi_ext import decode_packed
 from dapp.streamabletoken import StreamableToken
-from dapp.util import (
-    NoticeBuffer,
-    ReportBuffer,
-    hex_to_str,
-    logger,
-    rollup_server,
-    str_to_hex,
-)
+from dapp.util import decode_packed, hex_to_str, logger, rollup_server, str_to_hex
 
 network = environ.get("NETWORK", "localhost")
 ERC20PortalFile = open(f"./deployments/{network}/ERC20Portal.json")
 erc20Portal = json.load(ERC20PortalFile)
-
-
-notice_buffer = NoticeBuffer()
-report_buffer = ReportBuffer()
 
 
 # Function selector to be called during the execution of a voucher that transfers funds,
@@ -73,20 +61,6 @@ def report_success(msg, payload):
     return "accept"
 
 
-def send_notice_buffer(message):
-    notice_log = {
-        "message": message,
-    }
-    return notice_buffer.add(json.dumps(notice_log))
-
-
-def send_report_buffer(message):
-    report_log = {
-        "message": message,
-    }
-    return report_buffer.add(json.dumps(report_log))
-
-
 def handle_deposit(data, connection):
     try:
         # Attempt to decode input as an ABI-packed-encoded ERC20 deposit
@@ -106,12 +80,10 @@ def handle_deposit(data, connection):
         StreamableToken(connection, erc20).mint(amount, depositor)
 
         # Post notice about the deposit and minting
-        send_report_buffer("Success")
+        report_success("Success", str_to_hex(json.dumps(data)))
         return "accept"
 
     except Exception as e:
-        notice_buffer.clear()
-        report_buffer.clear()
         return report_error(
             f"Error processing data {data}\n{traceback.format_exc()}", data["payload"]
         )
@@ -131,7 +103,6 @@ def handle_action(data, connection):
                 block_start=int(payload["args"]["start"]),
                 current_block=int(data["metadata"]["block_number"]),
             )
-            StreamableToken(connection, payload["args"]["token"])._persist_storage()
         elif payload["method"] == "stream_test":
             split_number = int(payload["args"]["split_number"])
             split_amount = int(payload["args"]["amount"]) // split_number
@@ -175,11 +146,9 @@ def handle_action(data, connection):
         else:
             return report_error(f"Unknown method {payload['method']}", data["payload"])
 
-        send_report_buffer("Success")
+        report_success("Success", str_to_hex(json.dumps(data)))
     except Exception as error:
         connection.rollback()
-        notice_buffer.clear()
-        report_buffer.clear()
         error_msg = f"{error}"
         return report_error(error_msg, data["payload"])
 
@@ -196,8 +165,6 @@ def handle_advance(data):
         else:
             status = handle_action(data, connection)
 
-        notice_buffer.send_all_grouped()
-        report_buffer.send_all_grouped()
         connection.commit()
         connection.close()
     except Exception as e:

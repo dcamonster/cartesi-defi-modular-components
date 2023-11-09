@@ -33,7 +33,9 @@ async function main() {
   }
 
   // Stream test
-  for (let i = 0; i < 1; i++) {
+  let streamCount = 0;
+  for (let i = 0; i < 100; i++) {
+    const step = 1000;
     const streamTestDuration = await measureExecutionTime(connection, () =>
       streamTest(
         tokenAddress,
@@ -41,17 +43,22 @@ async function main() {
         ethers.parseEther("1"),
         3600,
         0,
-        100000
+        step
       )
     );
-    console.log("Stream test duration:", streamTestDuration);
-  }
+    streamCount += step;
 
-  // Stream 1 token to ZeroAddress for 1 hour
-  const streamDuration = await measureExecutionTime(connection, () =>
-    stream(tokenAddress, ZeroAddress, ethers.parseEther("1"), 3600, 0)
-  );
-  console.log("Stream duration:", streamDuration);
+    const streamDuration = await measureExecutionTime(connection, () =>
+      stream(tokenAddress, ZeroAddress, ethers.parseEther("1"), 3600, 0)
+    );
+    console.log(
+      "Adding a new stream takes: ",
+      streamDuration,
+      "ms with ",
+      streamCount,
+      "on-going streams"
+    );
+  }
 
   await connection.destroy();
 }
