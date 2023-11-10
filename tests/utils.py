@@ -16,7 +16,7 @@ def get_unique_addresses_for_token(connection, token_address):
 
     cursor.execute(
         """
-        SELECT DISTINCT wallet_address FROM balance WHERE token_address = ?
+        SELECT DISTINCT account_address FROM balance WHERE token_address = ?
         """,
         (token_address,),
     )
@@ -35,7 +35,7 @@ def calculate_total_supply_token(connection, token_address):
     token = StreamableToken(connection, token_address)
     total_supply = 0
     for wallet in [address for address in addresses if address != ZERO_ADDRESS]:
-        balance = token.balance_of(wallet, 2**256 - 1)
+        balance = token.balance_of(wallet, 2**63 - 1)
         assert balance >= 0, "Balance cannot be negative."
         total_supply += balance
     return total_supply

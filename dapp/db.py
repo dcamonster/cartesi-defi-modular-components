@@ -7,33 +7,100 @@ db_file_path = "dapp.db"
 
 
 def get_connection():
-    return sqlite3.connect(db_file_path)
+    conn = sqlite3.connect(db_file_path)
+    conn.cursor().execute("PRAGMA foreign_keys = ON")
+    return conn
 
 
-def get_all_wallet_streams(connection, wallet_address, token_address) -> List[Stream]:
+def create_account_if_not_exists(connection, address):
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO account (address) VALUES (?)
+        """,
+        (address,),
+    )
+
+
+def create_token_if_not_exists(connection, token_address, default_total_supply=0):
+    create_account_if_not_exists(connection, token_address)
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO token (address, total_supply)
+        VALUES (?, ?)
+        """,
+        (token_address, int_to_str(default_total_supply)),
+    )
+
+
+def get_last_block(connection, account_address, token_address) -> int:
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        SELECT last_block FROM blocktracker
+        WHERE account_address = ? AND token_address = ?
+        """,
+        (account_address, token_address),
+    )
+    row = cursor.fetchone()
+    return row[0] if row else 0
+
+
+def update_block_tracker(
+    connection, account_address, token_address, last_block
+) -> None:
+    create_account_if_not_exists(connection, account_address)
+    create_token_if_not_exists(connection, token_address)
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        INSERT INTO blocktracker (account_address, token_address, last_block)
+        VALUES (?, ?, ?)
+        ON CONFLICT(account_address, token_address)
+        DO UPDATE SET last_block = ?
+        """,
+        (account_address, token_address, last_block, last_block),
+    )
+
+
+def stream_from_row(row) -> Stream:
+    return Stream(
+        stream_id=row[0],
+        from_address=row[1],
+        to_address=row[2],
+        start_block=row[3],
+        block_duration=row[4],
+        amount=str_to_int(row[5]),
+        token_address=row[6],
+        pair_address=row[7] if len(row) > 7 else None,
+    )
+
+
+def get_wallet_stream_range(
+    connection, account_address, token_address, start_before: int, not_ended_before: int
+) -> List[Stream]:
+    create_account_if_not_exists(connection, account_address)
+    create_token_if_not_exists(connection, token_address)
     cursor = connection.cursor()
     cursor.execute(
         """
         SELECT * FROM stream
-        WHERE (from_address = ? OR to_address = ?) AND token_address = ?
+        WHERE (from_address = ? OR to_address = ?) AND token_address = ? AND start_block <= ? AND start_block + block_duration >= ?
         """,
-        (wallet_address, wallet_address, token_address),
+        (
+            account_address,
+            account_address,
+            token_address,
+            start_before,
+            not_ended_before,
+        ),
     )
     rows = cursor.fetchall()
 
     streams = []
     for row in rows:
-        stream = Stream(
-            stream_id=row[0],
-            from_address=row[1],
-            to_address=row[2],
-            start_block=row[3],
-            block_duration=row[4],
-            amount=str_to_int(row[5]),
-            token_address=row[6],
-            pair_address=row[7] if len(row) > 7 else None,
-        )
-        streams.append(stream)
+        streams.append(stream_from_row(row))
 
     return streams
 
@@ -50,49 +117,48 @@ def get_stream_by_id(connection, stream_id) -> Stream:
     row = cursor.fetchone()
 
     if row is not None:
-        stream = Stream(
-            stream_id=row[0],
-            from_address=row[1],
-            to_address=row[2],
-            start_block=row[3],
-            block_duration=row[4],
-            amount=str_to_int(row[5]),
-            token_address=row[6],
-            pair_address=row[7] if len(row) > 7 else None,
-        )
-        return stream
+        return stream_from_row(row)
     else:
         return None
 
 
-def get_balance(connection, wallet_address, token_address) -> int:
+def get_balance(connection, account_address, token_address) -> int:
+    create_account_if_not_exists(connection, account_address)
+    create_token_if_not_exists(connection, token_address)
     cursor = connection.cursor()
     cursor.execute(
         """
         SELECT amount FROM balance
-        WHERE wallet_address = ? AND token_address = ?
+        WHERE account_address = ? AND token_address = ?
         """,
-        (wallet_address, token_address),
+        (account_address, token_address),
     )
     row = cursor.fetchone()
 
     return str_to_int(row[0]) if row else 0
 
 
-def set_balance(connection, wallet_address, token_address, amount) -> None:
+def set_balance(connection, account_address, token_address, amount) -> None:
+    create_account_if_not_exists(connection, account_address)
+    create_token_if_not_exists(connection, token_address)
     cursor = connection.cursor()
     cursor.execute(
         """
-        INSERT INTO balance (wallet_address, token_address, amount)
+        INSERT INTO balance (account_address, token_address, amount)
         VALUES (?, ?, ?)
-        ON CONFLICT(wallet_address, token_address)
+        ON CONFLICT(account_address, token_address)
         DO UPDATE SET amount = EXCLUDED.amount
         """,
-        (wallet_address, token_address, int_to_str(amount)),
+        (account_address, token_address, int_to_str(amount)),
     )
 
 
 def add_stream(connection, stream) -> int:
+    create_account_if_not_exists(connection, stream.from_address)
+    create_account_if_not_exists(connection, stream.to_address)
+    create_token_if_not_exists(connection, stream.token_address)
+    if stream.pair_address is not None:
+        create_token_if_not_exists(connection, stream.pair_address)
     cursor = connection.cursor()
     cursor.execute(
         """
@@ -113,7 +179,7 @@ def add_stream(connection, stream) -> int:
     return cursor.lastrowid
 
 
-def update_stream_by_id(connection, stream_id, block_duration, amount):
+def update_stream_amount_duration(connection, stream_id, block_duration, amount):
     cursor = connection.cursor()
     cursor.execute(
         """
@@ -137,6 +203,7 @@ def delete_stream_by_id(connection, stream_id):
 
 
 def get_total_supply(connection, token_address) -> int:
+    create_token_if_not_exists(connection, token_address)
     cursor = connection.cursor()
     cursor.execute(
         """
@@ -151,6 +218,7 @@ def get_total_supply(connection, token_address) -> int:
 
 
 def set_total_supply(connection, token_address: str, total_supply: int):
+    create_token_if_not_exists(connection, token_address)
     cursor = connection.cursor()
     cursor.execute(
         """

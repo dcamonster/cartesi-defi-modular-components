@@ -94,44 +94,45 @@ def handle_action(data, connection):
         str_payload = hex_to_str(data["payload"])
         payload = json.loads(str_payload)
 
+        sender = data["metadata"]["msg_sender"]
+        block_number = data["metadata"]["block_number"]
+
         if payload["method"] == "stream":
-            StreamableToken(connection, payload["args"]["token"]).transfer_from(
-                sender=data["metadata"]["msg_sender"],
+            StreamableToken(connection, payload["args"]["token"]).transfer(
                 receiver=payload["args"]["receiver"],
                 amount=int(payload["args"]["amount"]),
                 duration=int(payload["args"]["duration"]),
                 block_start=int(payload["args"]["start"]),
-                current_block=int(data["metadata"]["block_number"]),
+                sender=sender,
+                current_block=block_number,
             )
         elif payload["method"] == "stream_test":
             split_number = int(payload["args"]["split_number"])
             split_amount = int(payload["args"]["amount"]) // split_number
 
             for number in range(split_number):
-                StreamableToken(connection, payload["args"]["token"]).transfer_from(
-                    sender=data["metadata"]["msg_sender"],
+                StreamableToken(connection, payload["args"]["token"]).transfer(
                     receiver=payload["args"]["receiver"],
                     amount=split_amount,
                     duration=int(payload["args"]["duration"]) + number,
                     block_start=int(payload["args"]["start"]),
-                    current_block=int(data["metadata"]["block_number"]),
+                    sender=sender,
+                    current_block=block_number,
                 )
             StreamableToken(connection, payload["args"]["token"])
         elif payload["method"] == "unwrap":
             token_address = payload["args"]["token"]
             token = StreamableToken(connection, payload["args"]["token"])
             amount = int(payload["args"]["amount"])
-            msg_sender = data["metadata"]["msg_sender"]
             token.burn(
                 amount=amount,
-                wallet=msg_sender,
-                current_block=int(data["metadata"]["block_number"]),
+                sender=sender,
+                current_block=block_number,
             )
             # Encode a transfer function call that returns the amount back to the depositor
             transfer_payload = TRANSFER_FUNCTION_SELECTOR + encode(
-                ["address", "uint256"], [msg_sender, amount]
+                ["address", "uint256"], [sender, amount]
             )
-            # Post voucher executing the transfer on the ERC-20 contract: "I don't want your money"!
             voucher = {
                 "destination": token_address,
                 "payload": "0x" + transfer_payload.hex(),

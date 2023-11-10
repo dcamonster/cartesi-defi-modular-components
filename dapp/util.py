@@ -6,7 +6,7 @@ from os import environ
 from eth_abi.codec import ABICodec
 from eth_abi.decoding import AddressDecoder, BooleanDecoder, UnsignedIntegerDecoder
 from eth_abi.registry import BaseEquals, registry_packed
-from eth_utils import is_hex_address, to_checksum_address
+from eth_utils import is_hex_address, to_checksum_address, is_checksum_address
 
 # Constants
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
@@ -49,7 +49,7 @@ def str_to_hex(string):
 def str_to_int(string):
     """Converts a string to an integer. Returns 0 if conversion is not possible."""
     try:
-        return int(float(string))
+        return int(string)
     except (TypeError, ValueError):
         return 0
 
@@ -77,7 +77,23 @@ def with_checksum_address(func):
     return wrapper
 
 
-def apply_decorator_to_all_methods(decorator):
+def process_streams_before(func):
+    def wrapper(self, *args, **kwargs):
+        if "current_block" in kwargs and "sender" in kwargs:
+            current_block = kwargs["current_block"]
+            sender = kwargs["sender"]
+        else:
+            current_block = args[-1]
+            sender = args[-2]
+
+        self.process_streams(sender, current_block)
+
+        return func(self, *args, **kwargs)
+
+    return wrapper
+
+
+def apply(decorator):
     def class_decorator(cls):
         for attr_name, attr_value in cls.__dict__.items():
             if callable(attr_value):
@@ -108,3 +124,9 @@ logger.addHandler(handler)
 
 # Main code or configuration
 rollup_server = environ.get("ROLLUP_HTTP_SERVER_URL", "http://127.0.0.1:5004")
+
+# Utilities
+def address_or_raise(address):
+    if not is_checksum_address(address):
+        raise ValueError(f"Invalid address {address}")
+    return address
