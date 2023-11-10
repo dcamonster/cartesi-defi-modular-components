@@ -1,6 +1,3 @@
-import json
-from os import environ
-
 import requests
 
 from dapp.util import (
@@ -8,10 +5,6 @@ from dapp.util import (
     rollup_server,
 )
 from dapp.core import handle
-
-network = environ.get("NETWORK", "localhost")
-ERC20PortalFile = open(f"./deployments/{network}/ERC20Portal.json")
-erc20Portal = json.load(ERC20PortalFile)
 
 finish = {"status": "accept"}
 

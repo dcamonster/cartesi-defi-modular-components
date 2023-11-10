@@ -13,9 +13,6 @@ network = environ.get("NETWORK", "localhost")
 ERC20PortalFile = open(f"./deployments/{network}/ERC20Portal.json")
 erc20Portal = json.load(ERC20PortalFile)
 
-
-# Function selector to be called during the execution of a voucher that transfers funds,
-# which corresponds to the first 4 bytes of the Keccak256-encoded result of "transfer(address,uint256)"
 TRANSFER_FUNCTION_SELECTOR = b"\xa9\x05\x9c\xbb"
 
 
@@ -39,7 +36,6 @@ def send_post_request(endpoint, payload):
 
 
 def report_error(msg, payload):
-    """Function to handle and report errors."""
     error_log = {
         "error": True,
         "message": msg,
@@ -79,7 +75,7 @@ def handle_deposit(data, connection):
 
         StreamableToken(connection, erc20).mint(amount, depositor)
 
-        # Post notice about the deposit and minting
+        # Post report about the deposit and minting
         report_success("Success", str_to_hex(json.dumps(data)))
         return "accept"
 
@@ -106,7 +102,7 @@ def handle_action(data, connection):
                 sender=sender,
                 current_block=block_number,
             )
-        elif payload["method"] == "stream_test":
+        elif payload["method"] == "stream_test":  # Just for testing purposes
             split_number = int(payload["args"]["split_number"])
             split_amount = int(payload["args"]["amount"]) // split_number
 
@@ -120,7 +116,7 @@ def handle_action(data, connection):
                     current_block=block_number,
                 )
             StreamableToken(connection, payload["args"]["token"])
-        elif payload["method"] == "unwrap":
+        elif payload["method"] == "withdraw":
             token_address = payload["args"]["token"]
             token = StreamableToken(connection, payload["args"]["token"])
             amount = int(payload["args"]["amount"])
