@@ -11,6 +11,7 @@ class Stream:
         block_duration: int,
         amount: int,
         token_address: str,
+        accrued: bool,
         pair_address: Optional[str] = None,
     ):
         self.id = stream_id
@@ -20,6 +21,7 @@ class Stream:
         self.block_duration = block_duration
         self.amount = amount
         self.token_address = token_address
+        self.accrued = accrued
         self.pair_address = pair_address
 
     def has_started(self, current_block: int) -> bool:
@@ -36,21 +38,3 @@ class Stream:
 
         elapsed = until_block - self.start_block
         return (self.amount * elapsed) // self.block_duration
-
-    def stream_amt_btw(self, from_block: int, until_block: int) -> int:
-        if from_block > until_block:
-            raise ValueError("From block must be before until block.")
-
-        effective_start_block = max(self.start_block, from_block)
-        remaining_amount = self.amount - self.streamed_amt(effective_start_block)
-
-        if not self.has_started(until_block):
-            return 0
-        if self.has_ended(until_block):
-            return remaining_amount
-
-        remaining_time = self.block_duration - (
-            effective_start_block - self.start_block
-        )
-        elapsed = until_block - effective_start_block
-        return (remaining_amount * elapsed) // remaining_time

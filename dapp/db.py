@@ -34,36 +34,6 @@ def create_token_if_not_exists(connection, token_address, default_total_supply=0
     )
 
 
-def get_last_block(connection, account_address, token_address) -> int:
-    cursor = connection.cursor()
-    cursor.execute(
-        """
-        SELECT last_block FROM blocktracker
-        WHERE account_address = ? AND token_address = ?
-        """,
-        (account_address, token_address),
-    )
-    row = cursor.fetchone()
-    return row[0] if row else 0
-
-
-def update_block_tracker(
-    connection, account_address, token_address, last_block
-) -> None:
-    create_account_if_not_exists(connection, account_address)
-    create_token_if_not_exists(connection, token_address)
-    cursor = connection.cursor()
-    cursor.execute(
-        """
-        INSERT INTO blocktracker (account_address, token_address, last_block)
-        VALUES (?, ?, ?)
-        ON CONFLICT(account_address, token_address)
-        DO UPDATE SET last_block = ?
-        """,
-        (account_address, token_address, last_block, last_block),
-    )
-
-
 def stream_from_row(row) -> Stream:
     return Stream(
         stream_id=row[0],
@@ -73,12 +43,13 @@ def stream_from_row(row) -> Stream:
         block_duration=row[4],
         amount=str_to_int(row[5]),
         token_address=row[6],
-        pair_address=row[7] if len(row) > 7 else None,
+        accrued=True if row[7] == 1 else False,
+        pair_address=row[8] if len(row) > 8 else None,
     )
 
 
-def get_wallet_stream_range(
-    connection, account_address, token_address, start_before: int, not_ended_before: int
+def get_wallet_non_accrued_streams(
+    connection, account_address, token_address
 ) -> List[Stream]:
     create_account_if_not_exists(connection, account_address)
     create_token_if_not_exists(connection, token_address)
@@ -86,15 +57,31 @@ def get_wallet_stream_range(
     cursor.execute(
         """
         SELECT * FROM stream
-        WHERE (from_address = ? OR to_address = ?) AND token_address = ? AND start_block <= ? AND start_block + block_duration >= ?
+        WHERE (from_address = ? OR to_address = ?) AND token_address = ? AND accrued = 0
         """,
-        (
-            account_address,
-            account_address,
-            token_address,
-            start_before,
-            not_ended_before,
-        ),
+        (account_address, account_address, token_address),
+    )
+    rows = cursor.fetchall()
+
+    streams = []
+    for row in rows:
+        streams.append(stream_from_row(row))
+
+    return streams
+
+
+def get_wallet_endend_streams(
+    connection, account_address, token_address, current_block
+) -> List[Stream]:
+    create_account_if_not_exists(connection, account_address)
+    create_token_if_not_exists(connection, token_address)
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        SELECT * FROM stream
+        WHERE (from_address = ? OR to_address = ?) AND token_address = ? AND start_block + block_duration <= ? AND accrued = 0
+        """,
+        (account_address, account_address, token_address, current_block),
     )
     rows = cursor.fetchall()
 
@@ -162,8 +149,8 @@ def add_stream(connection, stream) -> int:
     cursor = connection.cursor()
     cursor.execute(
         """
-        INSERT INTO stream (from_address, to_address, start_block, block_duration, amount, token_address, pair_address)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO stream (from_address, to_address, start_block, block_duration, amount, token_address, accrued, pair_address)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             stream.from_address,
@@ -172,6 +159,7 @@ def add_stream(connection, stream) -> int:
             stream.block_duration,
             int_to_str(stream.amount),
             stream.token_address,
+            1 if stream.accrued else 0,
             stream.pair_address,
         ),
     )
@@ -188,6 +176,18 @@ def update_stream_amount_duration(connection, stream_id, block_duration, amount)
         WHERE id = ?
         """,
         (block_duration, int_to_str(amount), stream_id),
+    )
+
+
+def update_stream_accrued(connection, stream_id, accrued):
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        UPDATE stream
+        SET accrued = ?
+        WHERE id = ?
+        """,
+        (1 if accrued else 0, stream_id),
     )
 
 

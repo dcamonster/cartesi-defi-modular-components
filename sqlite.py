@@ -24,19 +24,6 @@ def initialise_db():
 
     cursor.execute(
         """
-        CREATE TABLE IF NOT EXISTS blocktracker (
-            account_address TEXT NOT NULL,
-            token_address TEXT NOT NULL,
-            last_block INTEGER NOT NULL,
-            FOREIGN KEY (account_address) REFERENCES account(address),
-            FOREIGN KEY (token_address) REFERENCES token(address),
-            PRIMARY KEY (account_address, token_address)
-        )
-        """
-    )
-
-    cursor.execute(
-        """
         CREATE TABLE IF NOT EXISTS token (
             address TEXT PRIMARY KEY,
             total_supply TEXT NOT NULL,
@@ -69,6 +56,7 @@ def initialise_db():
             amount TEXT NOT NULL,
             token_address TEXT NOT NULL,
             pair_address TEXT,
+            accrued INTEGER NOT NULL,
             FOREIGN KEY (token_address) REFERENCES token(address),
             FOREIGN KEY (pair_address) REFERENCES token(address),
             FOREIGN KEY (from_address) REFERENCES account(address),

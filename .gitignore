@@ -3,3 +3,4 @@ frontend-console
 __pycache__
 venv
 storage
+dapp.db

@@ -124,6 +124,7 @@ def handle_action(data, connection):
                         block_duration=int(payload["args"]["duration"]) + number,
                         amount=split_amount,
                         token_address=to_checksum_address(payload["args"]["token"]),
+                        accrued=False,
                         pair_address=None,
                     )
                 )

@@ -4,13 +4,13 @@ from dapp.db import (
     add_stream,
     delete_stream_by_id,
     get_balance,
-    get_last_block,
     get_stream_by_id,
     get_total_supply,
-    get_wallet_stream_range,
+    get_wallet_endend_streams,
+    get_wallet_non_accrued_streams,
     set_balance,
     set_total_supply,
-    update_block_tracker,
+    update_stream_accrued,
     update_stream_amount_duration,
 )
 from dapp.stream import Stream
@@ -37,20 +37,18 @@ class StreamableToken:
     def set_stored_balance(self, wallet: str, amount: int):
         return set_balance(self._connection, wallet, self._address, amount)
 
-    def get_wallet_stream_range(
-        self, wallet: str, start_before: int, not_ended_before: int
+    def get_wallet_non_accrued_streams(self, wallet: str) -> List[Stream]:
+        return get_wallet_non_accrued_streams(self._connection, wallet, self._address)
+
+    def get_wallet_endend_streams(
+        self, wallet: str, current_block: int
     ) -> List[Stream]:
-        return get_wallet_stream_range(
-            self._connection, wallet, self._address, start_before, not_ended_before
+        return get_wallet_endend_streams(
+            self._connection, wallet, self._address, current_block
         )
 
-    def get_wallet_last_block(self, wallet: str) -> int:
-        return get_last_block(self._connection, wallet, self._address)
-
-    def set_wallet_last_block(self, wallet: str, block_number: int):
-        return update_block_tracker(
-            self._connection, wallet, self._address, block_number
-        )
+    def set_stream_accrued(self, stream_id: int):
+        return update_stream_accrued(self._connection, stream_id, True)
 
     def get_stream_by_id(self, stream_id: int) -> Stream:
         return get_stream_by_id(self._connection, stream_id)
@@ -65,27 +63,18 @@ class StreamableToken:
         return set_total_supply(self._connection, self._address, amount)
 
     def process_streams(self, account_address: str, current_block: int):
-        last_block_processed = get_last_block(
-            self._connection, account_address, self._address
-        )
-
-        start_before = max(current_block, last_block_processed)
-        not_ended_before = last_block_processed
-        streams = self.get_wallet_stream_range(
-            account_address, start_before, not_ended_before
-        )
+        ended_streams = self.get_wallet_endend_streams(account_address, current_block)
 
         balance = self.get_stored_balance(account_address)
-        for stream in streams:
-            streamed_amount = stream.stream_amt_btw(last_block_processed, current_block)
+        for stream in ended_streams:
+            self.set_stream_accrued(stream.id)
+            streamed_amount = stream.streamed_amt(current_block)
             if stream.from_address == account_address:
                 balance -= streamed_amount
             if stream.to_address == account_address:
                 balance += streamed_amount
 
         self.set_stored_balance(account_address, balance)
-
-        self.set_wallet_last_block(account_address, current_block)
 
     def mint(self, amount: int, wallet: str):
         address_or_raise(wallet)
@@ -109,12 +98,11 @@ class StreamableToken:
     def balance_of(self, account_address: str, at_block: int, count_received=True):
         address_or_raise(account_address)
         balance = self.get_stored_balance(account_address)
-        last_block = self.get_wallet_last_block(account_address)
 
-        streams = self.get_wallet_stream_range(account_address, at_block, last_block)
+        streams = self.get_wallet_non_accrued_streams(account_address)
 
         for stream in streams:
-            streamed = stream.stream_amt_btw(last_block, at_block)
+            streamed = stream.streamed_amt(at_block)
 
             if count_received and stream.to_address == account_address:
                 balance += streamed
@@ -159,13 +147,15 @@ class StreamableToken:
 
         return self.add_stream(
             Stream(
-                "",
-                sender,
-                receiver,
-                block_start,
-                duration,
-                amount,
-                self.get_address(),
+                stream_id="",
+                from_address=sender,
+                to_address=receiver,
+                start_block=block_start,
+                block_duration=duration,
+                amount=amount,
+                token_address=self.get_address(),
+                accrued=False,
+                pair_address=None,
             )
         )
 
