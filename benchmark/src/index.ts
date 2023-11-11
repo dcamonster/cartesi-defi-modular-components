@@ -33,32 +33,36 @@ async function main() {
   }
 
   // Stream test
-  let streamCount = 0;
-  for (let i = 0; i < 100; i++) {
-    const step = 1000;
-    const streamTestDuration = await measureExecutionTime(connection, () =>
-      streamTest(
-        tokenAddress,
-        ZeroAddress,
-        ethers.parseEther("1"),
-        3600,
-        0,
-        step
-      )
+  const streamNumber = 1_000_000;
+  const addTestStreamsDuration = await measureExecutionTime(connection, () => {
+    return streamTest(
+      tokenAddress,
+      ZeroAddress,
+      ethers.parseEther("1"),
+      3600,
+      0,
+      streamNumber
     );
-    streamCount += step;
+  });
 
-    const streamDuration = await measureExecutionTime(connection, () =>
-      stream(tokenAddress, ZeroAddress, ethers.parseEther("1"), 3600, 0)
-    );
-    console.log(
-      "Adding a new stream takes: ",
-      streamDuration,
-      "ms with ",
-      streamCount,
-      "on-going streams"
-    );
-  }
+  console.log(
+    "Added ",
+    streamNumber,
+    "streams in",
+    addTestStreamsDuration,
+    "ms"
+  );
+
+  const streamDuration = await measureExecutionTime(connection, () =>
+    stream(tokenAddress, ZeroAddress, ethers.parseEther("1"), 3600, 0)
+  );
+  console.log(
+    "Adding a new stream takes: ",
+    streamDuration,
+    "ms with ",
+    streamNumber,
+    "on-going streams"
+  );
 
   await connection.destroy();
 }

@@ -6,8 +6,16 @@ import requests
 from eth_abi.abi import encode
 
 from dapp.db import get_connection
+from dapp.stream import Stream
 from dapp.streamabletoken import StreamableToken
-from dapp.util import decode_packed, hex_to_str, logger, rollup_server, str_to_hex
+from dapp.util import (
+    decode_packed,
+    hex_to_str,
+    logger,
+    rollup_server,
+    str_to_hex,
+    to_checksum_address,
+)
 
 network = environ.get("NETWORK", "localhost")
 ERC20PortalFile = open(f"./deployments/{network}/ERC20Portal.json")
@@ -107,15 +115,18 @@ def handle_action(data, connection):
             split_amount = int(payload["args"]["amount"]) // split_number
 
             for number in range(split_number):
-                StreamableToken(connection, payload["args"]["token"]).transfer(
-                    receiver=payload["args"]["receiver"],
-                    amount=split_amount,
-                    duration=int(payload["args"]["duration"]) + number,
-                    block_start=int(payload["args"]["start"]),
-                    sender=sender,
-                    current_block=block_number,
+                StreamableToken(connection, payload["args"]["token"]).add_stream(
+                    Stream(
+                        "",
+                        from_address=to_checksum_address(sender),
+                        to_address=to_checksum_address(payload["args"]["receiver"]),
+                        start_block=int(block_number),
+                        block_duration=int(payload["args"]["duration"]) + number,
+                        amount=split_amount,
+                        token_address=to_checksum_address(payload["args"]["token"]),
+                        pair_address=None,
+                    )
                 )
-            StreamableToken(connection, payload["args"]["token"])
         elif payload["method"] == "withdraw":
             token_address = payload["args"]["token"]
             token = StreamableToken(connection, payload["args"]["token"])
