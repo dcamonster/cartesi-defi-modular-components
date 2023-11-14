@@ -20,13 +20,22 @@ RUN pip install -r requirements.txt --no-cache \
 # runtime stage: produces final image that will be executed
 FROM --platform=linux/riscv64 cartesi/python:3.10-slim-jammy
 
+# Install libsqlite3-0 in the runtime stage
+RUN apt-get update \
+    && apt-get install -y libsqlite3-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the virtual environment from build-stage
 COPY --from=build-stage /opt/venv /opt/venv
 
+# Set environment variable to ensure that the virtual environment is used
+ENV PATH="/opt/venv/bin:$PATH"
+
 WORKDIR /opt/cartesi/dapp
+
+# Copy necessary files
 COPY ./entrypoint.sh .
 COPY ./dapp ./dapp
-
-# Init sqlite database
 COPY ./sqlite.py .
-RUN python sqlite.py
-RUN rm sqlite.py
+
+RUN python3 ./sqlite.py

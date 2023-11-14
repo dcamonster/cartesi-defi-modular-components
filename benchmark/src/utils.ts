@@ -254,11 +254,9 @@ export const inputBoxAddInput = async (payload: string): Promise<void> => {
     "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
   const wallet = new ethers.Wallet(privateKey, provider);
 
-  const nonce = await provider.getTransactionCount(wallet.address, "pending");
-
   const contract = new ethers.Contract(InputBox.address, InputBox.abi, wallet);
 
-  const tx = await contract.addInput(Dapp.address, payload, { nonce });
+  const tx = await contract.addInput(Dapp.address, payload);
   await tx.wait();
   console.log("Input added to", InputBox.address);
 };
@@ -270,7 +268,9 @@ export const stream = async (
   duration: number,
   start: number
 ): Promise<void> => {
-  inputBoxAddInput(getStreamBody(token, receiver, amount, duration, start));
+  return inputBoxAddInput(
+    getStreamBody(token, receiver, amount, duration, start)
+  );
 };
 
 export const streamTest = async (
@@ -281,7 +281,7 @@ export const streamTest = async (
   start: number,
   split_number: number
 ): Promise<void> => {
-  inputBoxAddInput(
+  return inputBoxAddInput(
     getStreamTestBody(token, receiver, amount, duration, start, split_number)
   );
 };

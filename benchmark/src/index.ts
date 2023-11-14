@@ -9,13 +9,6 @@ import {
   streamTest,
 } from "./utils";
 
-// Sample function to show ethers working with TypeScript
-function showEthersVersion() {
-  console.log("Using ethers version:", ethers.version);
-}
-
-showEthersVersion();
-
 async function main() {
   const connection = await database();
 
@@ -33,7 +26,7 @@ async function main() {
   }
 
   // Stream test
-  const streamNumber = 1_000_000;
+  const streamNumber = 25_000;
   const addTestStreamsDuration = await measureExecutionTime(connection, () => {
     return streamTest(
       tokenAddress,
