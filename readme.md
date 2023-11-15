@@ -167,11 +167,3 @@ Run unit tests using `python -m unittest discover -s tests`. Continuous testing 
 ## Development and Contributions
 
 Contributions to the project are welcome. Please adhere to the coding standards and guidelines provided in the documentation. Use the provided Docker environment for a consistent development setup.
-
-## Future Enhancements
-
-Future updates will focus on enhancing scalability, improving integration with other Cartesi DApps, and possibly extending functionality to support new use cases like DeFi protocols and NFT marketplaces.
-
-## Conclusion
-
-This Streamable Token Python implementation for Cartesi is a robust solution for anyone looking to explore or develop applications requiring real-time, continuous token transactions. It stands as a testament to the innovative potential of token streaming in the blockchain space.
