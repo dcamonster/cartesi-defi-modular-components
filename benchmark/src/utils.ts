@@ -1,20 +1,17 @@
-import { ZeroAddress, ethers, parseUnits } from "ethers";
+import { ethers } from "ethers";
 
-import {
-  ICartesiDApp__factory,
-  IERC20Portal__factory,
-  IInputBox__factory,
-} from "@cartesi/rollups";
 import { erc20MintableABI, erc20MintableByteCode } from "./erc20Mintable";
 
-import ERC20Portal from "../../deployments/localhost/ERC20Portal.json";
-import Dapp from "../../deployments/localhost/dapp.json";
-import InputBox from "../../deployments/localhost/InputBox.json";
 import { Connection, MoreThan } from "typeorm";
+import ERC20Portal from "../../deployments/localhost/ERC20Portal.json";
+import InputBox from "../../deployments/localhost/InputBox.json";
+import Dapp from "../../deployments/localhost/dapp.json";
 import { Input } from "./entity/Input";
 import { Notice } from "./entity/Notice";
 import { Report } from "./entity/Report";
-import { token } from "@cartesi/rollups/dist/src/types/@openzeppelin/contracts";
+
+const privateKey =
+  "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"; // hardhat node's first account private key
 
 const hexlify = (text: string) =>
   ethers.hexlify(ethers.toUtf8Bytes(text)) as `0x${string}`;
@@ -159,9 +156,6 @@ export const deployErc20 = async (
 ): Promise<string> => {
   const provider = new ethers.JsonRpcProvider("http://localhost:8545");
 
-  // Replace with your local node's first account private key for deploying the contract
-  const privateKey =
-    "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
   const wallet = new ethers.Wallet(privateKey, provider);
 
   const contractFactory = new ethers.ContractFactory(
@@ -175,7 +169,7 @@ export const deployErc20 = async (
 
   await contract.waitForDeployment();
   const address = await contract.getAddress();
-  console.log("Contract deployed to address:", address);
+  console.log("Test ERC20 deployed to address:", address);
 
   return address;
 };
@@ -186,9 +180,6 @@ export const mintErc20 = async (
 ): Promise<void> => {
   const provider = new ethers.JsonRpcProvider("http://localhost:8545");
 
-  // Replace with your local node's first account private key for deploying the contract
-  const privateKey =
-    "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
   const wallet = new ethers.Wallet(privateKey, provider);
 
   const contract = new ethers.Contract(tokenAddress, erc20MintableABI, wallet);
@@ -205,9 +196,6 @@ export const approveErc20 = async (
 ): Promise<void> => {
   const provider = new ethers.JsonRpcProvider("http://localhost:8545");
 
-  // Replace with your local node's first account private key for deploying the contract
-  const privateKey =
-    "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
   const wallet = new ethers.Wallet(privateKey, provider);
 
   const contract = new ethers.Contract(tokenAddress, erc20MintableABI, wallet);
@@ -225,9 +213,6 @@ export const erc20PortalDeposit = async (
 
   await approveErc20(tokenAddress, amount, ERC20Portal.address);
 
-  // Replace with your local node's first account private key for deploying the contract
-  const privateKey =
-    "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
   const wallet = new ethers.Wallet(privateKey, provider);
 
   const contract = new ethers.Contract(
@@ -249,9 +234,6 @@ export const erc20PortalDeposit = async (
 export const inputBoxAddInput = async (payload: string): Promise<void> => {
   const provider = new ethers.JsonRpcProvider("http://localhost:8545");
 
-  // Replace with your local node's first account private key for deploying the contract
-  const privateKey =
-    "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
   const wallet = new ethers.Wallet(privateKey, provider);
 
   const contract = new ethers.Contract(InputBox.address, InputBox.abi, wallet);

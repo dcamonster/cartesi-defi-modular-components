@@ -12,6 +12,8 @@ import {
 async function main() {
   const connection = await database();
 
+  console.log("Running benchmark tests on", connection.name);
+
   let tokenAddress: string = "";
   if (!tokenAddress) {
     tokenAddress = await deployErc20("test", "test");
@@ -26,7 +28,7 @@ async function main() {
   }
 
   // Stream test
-  const streamNumber = 25_000;
+  const streamNumber = 50_000;
   const addTestStreamsDuration = await measureExecutionTime(connection, () => {
     return streamTest(
       tokenAddress,
