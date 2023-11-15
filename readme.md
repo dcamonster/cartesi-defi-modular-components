@@ -110,14 +110,11 @@ yarn start
 
 By default, the benchmark tests 25,000 simultaneous streams, aligning with the intended benchmarking objective. However, this number can be modified in the [index.ts](./benchmark/src/index.ts) file.
 
-Results:
+Results running the Dapp in production mode:
 
-| Test Run | Number of Simulateneous Streams | Time to Integrate New Stream (s) | Notes |
-| -------- | ------------------------------- | -------------------------------- | ----- |
-| 1        | 25,000                          | 8089 ms                          |       |
-| 2        | 50,000                          |                                  |       |
-| 3        | 75,000                          |                                  |       |
-| 3        | 100,000                         |                                  |       |
+| Test Run | Number of Simulateneous Streams | Time to Integrate New Stream (s) | Notes                                  |
+| -------- | ------------------------------- | -------------------------------- | -------------------------------------- |
+| 1        | 25,000                          | 8089 ms                          | 25k simulatenous streams goal achieved |
 
 ### Setting Up
 
