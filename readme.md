@@ -114,7 +114,7 @@ Results running the Dapp in production mode:
 
 | Test Run | Number of Simulateneous Streams | Time to Integrate New Stream (s) | Notes                                  |
 | -------- | ------------------------------- | -------------------------------- | -------------------------------------- |
-| 1        | 25,000                          | 8089 ms                          | 25k simulatenous streams goal achieved |
+| 1        | 25,000                          | 8089 ms                          | 25k simultaneous streams goal achieved |
 
 ### Setting Up
 
