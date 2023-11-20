@@ -1,5 +1,7 @@
 from typing import List
 
+from line_profiler import profile
+
 from dapp.db import (
     add_stream,
     delete_stream_by_id,
@@ -7,11 +9,11 @@ from dapp.db import (
     get_stream_by_id,
     get_total_supply,
     get_wallet_endend_streams,
-    get_wallet_non_accrued_streams,
     set_balance,
     set_total_supply,
     update_stream_accrued,
     update_stream_amount_duration,
+    get_wallet_non_accrued_streamed_amts,
 )
 from dapp.stream import Stream
 from dapp.util import (
@@ -36,9 +38,6 @@ class StreamableToken:
 
     def set_stored_balance(self, wallet: str, amount: int):
         return set_balance(self._connection, wallet, self._address, amount)
-
-    def get_wallet_non_accrued_streams(self, wallet: str) -> List[Stream]:
-        return get_wallet_non_accrued_streams(self._connection, wallet, self._address)
 
     def get_wallet_endend_streams(
         self, wallet: str, current_block: int
@@ -99,16 +98,13 @@ class StreamableToken:
         address_or_raise(account_address)
         balance = self.get_stored_balance(account_address)
 
-        streams = self.get_wallet_non_accrued_streams(account_address)
+        streamed_amounts = get_wallet_non_accrued_streamed_amts(
+            self._connection, account_address, self._address, at_block
+        )
 
-        for stream in streams:
-            streamed = stream.streamed_amt(at_block)
-
-            if count_received and stream.to_address == account_address:
-                balance += streamed
-
-            if stream.from_address == account_address:
-                balance -= streamed
+        balance += sum(
+            streamed for streamed in streamed_amounts if count_received or streamed < 0
+        )
 
         return balance
 
@@ -129,13 +125,11 @@ class StreamableToken:
         assert sender != receiver, "Sender and receiver must be different."
         assert amount > 0, "Amount must be positive."
 
-        balance = self.balance_of(sender, current_block)
-        assert balance >= amount, "Insufficient current balance to transfer."
         future_balance_after_send = self.balance_of(
             sender, block_start + duration, False
         )
         assert (
-            block_start == current_block or future_balance_after_send >= amount
+            future_balance_after_send >= amount
         ), "Insufficient future balance to transfer. Check your streams."
 
         if duration == 0:

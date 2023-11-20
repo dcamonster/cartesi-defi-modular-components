@@ -3,4 +3,5 @@ frontend-console
 __pycache__
 venv
 storage
+listener.py.lprof
 dapp.db

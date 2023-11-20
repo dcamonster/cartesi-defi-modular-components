@@ -125,6 +125,7 @@ logger.addHandler(handler)
 # Main code or configuration
 rollup_server = environ.get("ROLLUP_HTTP_SERVER_URL", "http://127.0.0.1:5004")
 
+
 # Utilities
 def address_or_raise(address):
     if not is_checksum_address(address):

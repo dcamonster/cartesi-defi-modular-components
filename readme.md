@@ -105,10 +105,10 @@ To execute the benchmarking script, the following commands are required:
 ```bash
 cd benchmark
 yarn install
-yarn start
+yarn start --streamNumber 25000 # or any other number of streams
 ```
 
-By default, the benchmark tests 25,000 simultaneous streams, aligning with the intended benchmarking objective. However, this number can be modified in the [index.ts](./benchmark/src/index.ts) file.
+By default, the benchmark tests 25,000 simultaneous streams, aligning with the intended benchmarking objective. However, this number can be modified by passing the `--streamNumber` flag.
 
 Results running the Dapp in production mode:
 

@@ -10,7 +10,7 @@
     "@cartesi/rollups": "1.1.0"
   },
   "scripts": {
-    "start": "ts-node src/index.ts"
+     "start": "ts-node src/index.ts"
   },
   "devDependencies": {
     "@types/node": "^20.8.9",

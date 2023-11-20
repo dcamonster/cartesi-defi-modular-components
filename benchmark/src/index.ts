@@ -12,6 +12,16 @@ import {
 async function main() {
   const connection = await database();
 
+  const args = process.argv;
+  const streamNumberIndex = args.findIndex((arg) => arg === "--streamNumber");
+  let streamNumber = 0;
+  if (streamNumberIndex === -1) {
+    streamNumber = 25_000;
+  } else {
+    streamNumber = parseInt(args[streamNumberIndex + 1]);
+  }
+  console.log("Test with", streamNumber, "consecutive streams")
+
   console.log("Running benchmark tests on", connection.name);
 
   let tokenAddress: string = "";
@@ -28,17 +38,16 @@ async function main() {
   }
 
   // Stream test
-  const streamNumber = 50_000;
-  const addTestStreamsDuration = await measureExecutionTime(connection, () => {
-    return streamTest(
+  const addTestStreamsDuration = await measureExecutionTime(connection, () =>
+    streamTest(
       tokenAddress,
       ZeroAddress,
       ethers.parseEther("1"),
       3600,
       0,
       streamNumber
-    );
-  });
+    )
+  );
 
   console.log(
     "Added ",

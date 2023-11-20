@@ -65,6 +65,17 @@ def initialise_db():
         """
     )
 
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_from_address ON stream(from_address)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_to_address ON stream(to_address)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_token_address ON stream(token_address)"
+    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_stream_accrued ON stream(accrued)")
+
     conn.commit()
 
     conn.close()

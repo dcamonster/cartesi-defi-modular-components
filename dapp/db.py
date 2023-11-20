@@ -1,14 +1,17 @@
 import sqlite3
 from typing import List
 from dapp.stream import Stream
-from dapp.util import int_to_str, str_to_int
+from dapp.util import int_to_str, str_to_int, to_checksum_address
+from line_profiler import profile
 
 db_file_path = "dapp.db"
 
 
 def get_connection():
     conn = sqlite3.connect(db_file_path)
-    conn.cursor().execute("PRAGMA foreign_keys = ON")
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON")
+    cursor.execute("PRAGMA journal_mode = WAL")
     return conn
 
 
@@ -48,26 +51,35 @@ def stream_from_row(row) -> Stream:
     )
 
 
-def get_wallet_non_accrued_streams(
-    connection, account_address, token_address
-) -> List[Stream]:
+def get_wallet_non_accrued_streamed_amts(
+    connection, account_address, token_address, until_block
+):
     create_account_if_not_exists(connection, account_address)
     create_token_if_not_exists(connection, token_address)
     cursor = connection.cursor()
     cursor.execute(
         """
-        SELECT * FROM stream
+        SELECT start_block, block_duration, amount, to_address
+        FROM stream
         WHERE (from_address = ? OR to_address = ?) AND token_address = ? AND accrued = 0
+        AND start_block <= ?
         """,
-        (account_address, account_address, token_address),
+        (account_address, account_address, token_address, until_block),
     )
-    rows = cursor.fetchall()
 
-    streams = []
-    for row in rows:
-        streams.append(stream_from_row(row))
+    for row in cursor:
+        start_block, block_duration, amount, to_address = row
+        amount = int(amount)
 
-    return streams
+        if until_block < start_block:
+            streamed_amount = 0
+        elif until_block >= start_block + block_duration:
+            streamed_amount = amount
+        else:
+            elapsed = until_block - start_block
+            streamed_amount = (amount * elapsed) // block_duration
+
+        yield (streamed_amount if to_address == account_address else -streamed_amount)
 
 
 def get_wallet_endend_streams(
@@ -228,4 +240,44 @@ def set_total_supply(connection, token_address: str, total_supply: int):
         DO UPDATE SET total_supply = ?
         """,
         (token_address, int_to_str(total_supply), int_to_str(total_supply)),
+    )
+
+
+# Test only
+@profile
+def stream_test(payload, sender, block_number, connection):
+    split_number = int(payload["args"]["split_number"])
+    split_amount = int(payload["args"]["amount"]) // split_number
+
+    sender_checksum = to_checksum_address(sender)
+    receiver_checksum = to_checksum_address(payload["args"]["receiver"])
+    token_checksum = to_checksum_address(payload["args"]["token"])
+
+    create_account_if_not_exists(connection, sender_checksum)
+    create_account_if_not_exists(connection, receiver_checksum)
+    create_token_if_not_exists(connection, token_checksum)
+    stream_data = []
+    amt = str(int(split_amount))
+    duration = int(payload["args"]["duration"])
+    for number in range(split_number):
+        stream_data.append(
+            (
+                sender_checksum,
+                receiver_checksum,
+                block_number,
+                duration + number,
+                amt,
+                token_checksum,
+                0,
+                None,
+            )
+        )
+
+    cursor = connection.cursor()
+    cursor.executemany(
+        """
+                INSERT INTO stream (from_address, to_address, start_block, block_duration, amount, token_address, accrued, pair_address)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+        stream_data,
     )
