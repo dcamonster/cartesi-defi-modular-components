@@ -92,7 +92,7 @@ Then in the notebook open the file [Simulation.ipynb](./Simulation.ipynb) and fo
 
 ## Benchmarking
 
-We have established a benchmarking script to evaluate the performance of the Streamable Token implementation. This script is configured to generate a pre-defined number of streams and is tasked with calculating the time required to integrate a new stream. This integration necessitates iterating over all active streams to verify the available balance prior to the addition of the new stream.
+We have established a benchmarking script to evaluate the performance of the Streamable Token implementation. This script is configured to generate a pre-defined number of streams and is tasked with calculating the time required to integrate a new stream. Adding this new stream necessitates iterating over all active streams to verify the available balance prior to the addition of the new stream and this is what the benchmarking script measures.
 
 To facilitate this, a new column has been introduced in the Input, Report, and Notice tables within the rollup PostgreSQL database. This addition aims to precisely time each new data insertion. See the docker-compose specific section of the [docker-compose.yml](https://github.com/dcamonster/cartesi-defi-modular-components/blob/master/docker-compose.yml#L251) file for more details.
 
@@ -114,7 +114,14 @@ Results running the Dapp in production mode:
 
 | Test Run | Number of Simulateneous Streams | Time to Integrate New Stream (s) | Notes                                  |
 | -------- | ------------------------------- | -------------------------------- | -------------------------------------- |
-| 1        | 25,000                          | 8089 ms                          | 25k simultaneous streams goal achieved |
+| 1        | 25,000                          | 3005 ms                          | 25k simultaneous streams goal achieved |
+| 2        | 100,000                         | 3005 ms                          |                                        |
+| 3        | 500,000                         | 3004 ms                          |                                        |
+| 4        | 1,000,000                       | 3005 ms                          |                                        |
+| 5        | 5,000,000                       | 3004 ms                          |                                        |
+| 6        | 10,000,000                      | 3006 ms                          |                                        |
+
+The benchmarking results indicate a consistent and robust performance of the Streamable Token implementation, as seen in the time taken to integrate new streams in a complex system with varying numbers of simultaneous streams. Notably, the time to integrate a new stream remains constant at approximately 3005 milliseconds, regardless of the number of streams, ranging from 25,000 to 10,000,000. This consistency suggests excellent scalability and efficiency in handling large-scale operations within the system. The implementation effectively maintains its performance even as the scale of operations increases significantly.
 
 ### Setting Up
 

@@ -3,10 +3,10 @@ import database from "./db";
 import {
   deployErc20,
   erc20PortalDeposit,
+  executeStreamTests,
   measureExecutionTime,
   mintErc20,
-  stream,
-  streamTest,
+  stream
 } from "./utils";
 
 async function main() {
@@ -38,16 +38,7 @@ async function main() {
   }
 
   // Stream test
-  const addTestStreamsDuration = await measureExecutionTime(connection, () =>
-    streamTest(
-      tokenAddress,
-      ZeroAddress,
-      ethers.parseEther("1"),
-      3600,
-      0,
-      streamNumber
-    )
-  );
+  const addTestStreamsDuration = await executeStreamTests(connection, tokenAddress, streamNumber, ethers.parseEther("1"));
 
   console.log(
     "Added ",

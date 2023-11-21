@@ -1,7 +1,4 @@
-import { ethers } from "ethers";
-
-import { erc20MintableABI, erc20MintableByteCode } from "./erc20Mintable";
-
+import { ZeroAddress, ethers } from "ethers";
 import { Connection, MoreThan } from "typeorm";
 import ERC20Portal from "../../deployments/localhost/ERC20Portal.json";
 import InputBox from "../../deployments/localhost/InputBox.json";
@@ -9,6 +6,7 @@ import Dapp from "../../deployments/localhost/dapp.json";
 import { Input } from "./entity/Input";
 import { Notice } from "./entity/Notice";
 import { Report } from "./entity/Report";
+import { erc20MintableABI, erc20MintableByteCode } from "./erc20Mintable";
 
 const privateKey =
   "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"; // hardhat node's first account private key
@@ -380,4 +378,35 @@ export async function measureExecutionTime(
   await fn();
   await waitForNewReport(connection, lastReportTimestamp);
   return await getLastActionDuration(connection);
+}
+
+
+const MAX_STREAMS_PER_CALL = 50000;
+
+export async function executeStreamTests(connection: Connection, tokenAddress: string, streamNumber: number, amount: bigint): Promise<number> {
+  let totalDuration = 0;
+  let remainingStreams = streamNumber;
+
+  const batches = BigInt(Math.floor(streamNumber / MAX_STREAMS_PER_CALL));
+  const partialAmount = batches > 0 ? amount / batches : amount;
+
+  while (remainingStreams > 0) {
+    const streamsToSend = Math.min(remainingStreams, MAX_STREAMS_PER_CALL);
+    const duration = await measureExecutionTime(connection, () =>
+      streamTest(
+        tokenAddress,
+        ZeroAddress,
+        partialAmount,
+        3600,
+        0,
+        streamsToSend
+      )
+    );
+
+    console.log(`Added ${streamsToSend} streams in ${duration} ms`);
+    totalDuration += duration;
+    remainingStreams -= streamsToSend;
+  }
+
+  return totalDuration;
 }

@@ -1,7 +1,5 @@
 from typing import List
 
-from line_profiler import profile
-
 from dapp.db import (
     add_stream,
     delete_stream_by_id,

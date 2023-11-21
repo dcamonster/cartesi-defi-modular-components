@@ -2,7 +2,6 @@ import sqlite3
 from typing import List
 from dapp.stream import Stream
 from dapp.util import int_to_str, str_to_int, to_checksum_address
-from line_profiler import profile
 
 db_file_path = "dapp.db"
 
@@ -244,7 +243,6 @@ def set_total_supply(connection, token_address: str, total_supply: int):
 
 
 # Test only
-@profile
 def stream_test(payload, sender, block_number, connection):
     split_number = int(payload["args"]["split_number"])
     split_amount = int(payload["args"]["amount"]) // split_number
