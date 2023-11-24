@@ -3,7 +3,7 @@ from typing import List
 from dapp.stream import Stream
 from dapp.util import int_to_str, str_to_int, to_checksum_address
 
-db_file_path = "dapp.db"
+db_file_path = "dapp.sqlite"
 
 
 def get_connection():
@@ -46,7 +46,7 @@ def stream_from_row(row) -> Stream:
         amount=str_to_int(row[5]),
         token_address=row[6],
         accrued=True if row[7] == 1 else False,
-        pair_address=row[8] if len(row) > 8 else None,
+        swap_id=row[8] if len(row) > 8 else None,
     )
 
 
@@ -155,12 +155,12 @@ def add_stream(connection, stream) -> int:
     create_account_if_not_exists(connection, stream.from_address)
     create_account_if_not_exists(connection, stream.to_address)
     create_token_if_not_exists(connection, stream.token_address)
-    if stream.pair_address is not None:
-        create_token_if_not_exists(connection, stream.pair_address)
+    # if stream.pair_address is not None:
+    #     create_token_if_not_exists(connection, stream.pair_address)
     cursor = connection.cursor()
     cursor.execute(
         """
-        INSERT INTO stream (from_address, to_address, start_block, block_duration, amount, token_address, accrued, pair_address)
+        INSERT INTO stream (from_address, to_address, start_block, block_duration, amount, token_address, accrued, swap_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
@@ -171,7 +171,7 @@ def add_stream(connection, stream) -> int:
             int_to_str(stream.amount),
             stream.token_address,
             1 if stream.accrued else 0,
-            stream.pair_address,
+            stream.swap_id,
         ),
     )
 
@@ -274,7 +274,7 @@ def stream_test(payload, sender, block_number, connection):
     cursor = connection.cursor()
     cursor.executemany(
         """
-                INSERT INTO stream (from_address, to_address, start_block, block_duration, amount, token_address, accrued, pair_address)
+                INSERT INTO stream (from_address, to_address, start_block, block_duration, amount, token_address, accrued, swap_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
         stream_data,

@@ -12,7 +12,7 @@ class Stream:
         amount: int,
         token_address: str,
         accrued: bool,
-        pair_address: Optional[str] = None,
+        swap_id: Optional[str] = None,
     ):
         self.id = stream_id
         self.from_address = from_address
@@ -22,7 +22,7 @@ class Stream:
         self.amount = amount
         self.token_address = token_address
         self.accrued = accrued
-        self.pair_address = pair_address
+        self.swap_id = swap_id
 
     def has_started(self, current_block: int) -> bool:
         return current_block >= self.start_block

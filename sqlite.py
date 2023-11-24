@@ -2,7 +2,7 @@ import os
 
 from dapp.db import get_connection
 
-db_file_path = "dapp.db"
+db_file_path = "dapp.sqlite"
 
 
 def initialise_db():
@@ -27,6 +27,8 @@ def initialise_db():
         CREATE TABLE IF NOT EXISTS token (
             address TEXT PRIMARY KEY,
             total_supply TEXT NOT NULL,
+            is_pair INTEGER NOT NULL DEFAULT 0,
+            last_block_processed INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (address) REFERENCES account(address)
         )
         """
@@ -47,6 +49,16 @@ def initialise_db():
 
     cursor.execute(
         """
+        CREATE TABLE IF NOT EXISTS swap (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pair_address TEXT NOT NULL,
+            FOREIGN KEY (pair_address) REFERENCES token(address)
+        )
+        """
+    )
+
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS stream (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             from_address TEXT NOT NULL,
@@ -55,12 +67,12 @@ def initialise_db():
             block_duration INTEGER NOT NULL,
             amount TEXT NOT NULL,
             token_address TEXT NOT NULL,
-            pair_address TEXT,
+            swap_id TEXT,
             accrued INTEGER NOT NULL,
             FOREIGN KEY (token_address) REFERENCES token(address),
-            FOREIGN KEY (pair_address) REFERENCES token(address),
             FOREIGN KEY (from_address) REFERENCES account(address),
-            FOREIGN KEY (to_address) REFERENCES account(address)
+            FOREIGN KEY (to_address) REFERENCES account(address),
+            FOREIGN KEY (swap_id) REFERENCES swap(id)
         )
         """
     )

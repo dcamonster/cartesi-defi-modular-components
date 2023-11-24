@@ -147,7 +147,7 @@ class StreamableToken:
                 amount=amount,
                 token_address=self.get_address(),
                 accrued=False,
-                pair_address=None,
+                swap_id=None,
             )
         )
 
