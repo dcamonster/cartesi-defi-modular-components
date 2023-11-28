@@ -11,6 +11,7 @@ from eth_utils import is_hex_address, to_checksum_address, is_checksum_address
 
 # Constants
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+MINIMUM_LIQUIDITY = 100000
 
 
 # Custom Decoder Classes
@@ -80,12 +81,10 @@ def with_checksum_address(func):
 
 def process_streams_before(func):
     def wrapper(self, *args, **kwargs):
-        if "current_block" in kwargs and "sender" in kwargs:
-            current_block = kwargs["current_block"]
-            sender = kwargs["sender"]
-        else:
-            current_block = args[-1]
-            sender = args[-2]
+        if not "current_block" in kwargs or not "sender" in kwargs:
+            raise ValueError("Current block and sender must be provided.")
+        current_block = kwargs["current_block"]
+        sender = kwargs["sender"]
 
         self.process_streams(sender, current_block)
 
@@ -143,7 +142,7 @@ def addresses_to_hex(address1, address2):
     return ethereum_address
 
 
-def sort_tokens(token0, token1):
+def sort_tokens(token0: str, token1: str):
     token0, token1 = to_checksum_address(token0), to_checksum_address(token1)
     return (token0, token1) if token0 < token1 else (token1, token0)
 
@@ -152,3 +151,24 @@ def get_pair_address(token0, token1):
     token0, token1 = to_checksum_address(token0), to_checksum_address(token1)
     sorted_tokens = sort_tokens(token0, token1)
     return to_checksum_address(addresses_to_hex(sorted_tokens[0], sorted_tokens[1]))
+
+
+def quote(amount_a: int, reserve_a: int, reserve_b: int):
+    assert amount_a > 0, "AmmLibrary: INSUFFICIENT_AMOUNT"
+    assert reserve_a > 0 and reserve_b > 0, "AmmLibrary: INSUFFICIENT_LIQUIDITY"
+
+    return int((amount_a * reserve_b) // reserve_a)
+
+
+def get_amount_out(amount_in, reserve_in, reserve_out):
+    if amount_in <= 0:
+        raise ValueError("AMM: INSUFFICIENT_INPUT_AMOUNT")
+    if reserve_in <= 0 or reserve_out <= 0:
+        raise ValueError("AMM: INSUFFICIENT_LIQUIDITY")
+
+    amount_in_with_fee = amount_in * 997
+    numerator = amount_in_with_fee * reserve_out
+    denominator = reserve_in * 1000 + amount_in_with_fee
+    amount_out = numerator // denominator
+
+    return int(amount_out)

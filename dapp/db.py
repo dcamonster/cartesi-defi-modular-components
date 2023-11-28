@@ -36,6 +36,36 @@ def create_token_if_not_exists(connection, token_address, default_total_supply=0
     )
 
 
+def create_pair_if_not_exists(
+    connection, token_address, token_0_address, token_1_address
+):
+    create_token_if_not_exists(connection, token_address)
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO pair (address, token_0_address, token_1_address)
+        VALUES (?, ?, ?)
+        """,
+        (token_address, token_0_address, token_1_address),
+    )
+    return cursor.lastrowid
+
+
+def create_swap(connection, pair_address, token_0_address, token_1_address):
+    create_pair_if_not_exists(
+        connection, pair_address, token_0_address, token_1_address
+    )
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        INSERT INTO swap (pair_address)
+        VALUES (?)
+        """,
+        (pair_address,),
+    )
+    return cursor.lastrowid
+
+
 def stream_from_row(row) -> Stream:
     return Stream(
         stream_id=row[0],
@@ -190,6 +220,19 @@ def update_stream_amount_duration(connection, stream_id, block_duration, amount)
     )
 
 
+def update_sream_amount(connection, stream_ids_amounts):
+    cursor = connection.cursor()
+    cursor.executemany(
+        """
+        UPDATE stream
+        SET amount = ?
+        WHERE id = ?
+        """,
+        stream_ids_amounts,
+    )
+    return cursor.lastrowid
+
+
 def update_stream_accrued(connection, stream_id, accrued):
     cursor = connection.cursor()
     cursor.execute(
@@ -239,6 +282,21 @@ def set_total_supply(connection, token_address: str, total_supply: int):
         DO UPDATE SET total_supply = ?
         """,
         (token_address, int_to_str(total_supply), int_to_str(total_supply)),
+    )
+
+
+def set_last_block_processed(connection, pair_address: str, last_block_processed: int):
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        UPDATE pair
+        SET last_block_processed = ?
+        WHERE address = ?
+        """,
+        (
+            last_block_processed,
+            pair_address,
+        ),
     )
 
 

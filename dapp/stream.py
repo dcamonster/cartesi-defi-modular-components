@@ -30,6 +30,9 @@ class Stream:
     def has_ended(self, current_block: int) -> bool:
         return current_block >= self.start_block + self.block_duration
 
+    def is_active(self, current_block: int) -> bool:
+        return self.has_started(current_block) and not self.has_ended(current_block)
+
     def streamed_amt(self, until_block: int) -> int:
         if not self.has_started(until_block):
             return 0

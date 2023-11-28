@@ -27,9 +27,21 @@ def initialise_db():
         CREATE TABLE IF NOT EXISTS token (
             address TEXT PRIMARY KEY,
             total_supply TEXT NOT NULL,
-            is_pair INTEGER NOT NULL DEFAULT 0,
-            last_block_processed INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (address) REFERENCES account(address)
+        )
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS pair (
+            address TEXT PRIMARY KEY,
+            token_0_address TEXT NOT NULL,
+            token_1_address TEXT NOT NULL,
+            last_block_processed INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (address) REFERENCES token(address)
+            FOREIGN KEY (token_0_address) REFERENCES token(address)
+            FOREIGN KEY (token_1_address) REFERENCES token(address)
         )
         """
     )
@@ -67,8 +79,8 @@ def initialise_db():
             block_duration INTEGER NOT NULL,
             amount TEXT NOT NULL,
             token_address TEXT NOT NULL,
-            swap_id TEXT,
             accrued INTEGER NOT NULL,
+            swap_id TEXT,
             FOREIGN KEY (token_address) REFERENCES token(address),
             FOREIGN KEY (from_address) REFERENCES account(address),
             FOREIGN KEY (to_address) REFERENCES account(address),
