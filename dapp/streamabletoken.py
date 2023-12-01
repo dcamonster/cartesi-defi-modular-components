@@ -68,8 +68,16 @@ class StreamableToken:
             streamed_amount = stream.streamed_amt(current_block)
             if stream.from_address == account_address:
                 balance -= streamed_amount
+                balance_to = (
+                    self.get_stored_balance(stream.to_address) + streamed_amount
+                )
+                self.set_stored_balance(stream.to_address, balance_to)
             if stream.to_address == account_address:
                 balance += streamed_amount
+                balance_from = (
+                    self.get_stored_balance(stream.from_address) - streamed_amount
+                )
+                self.set_stored_balance(stream.from_address, balance_from)
 
         self.set_stored_balance(account_address, balance)
 
