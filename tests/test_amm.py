@@ -149,7 +149,7 @@ class TestAmm(unittest.TestCase):
 
         hook(
             self.connection,
-            self.pair.get_address(),
+            self.token_one_address,
             self.trader_address,
             current_block + 20000,
         )
@@ -158,6 +158,7 @@ class TestAmm(unittest.TestCase):
         actual_balance = self.token_two.balance_of(
             self.trader_address, current_block + 300
         )
+
         difference = token_two_out / actual_balance
         print((1 - difference) * 100)
 
