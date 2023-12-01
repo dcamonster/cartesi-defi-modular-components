@@ -3,7 +3,7 @@ from typing import List
 from dapp.stream import Stream
 from dapp.util import int_to_str, str_to_int, to_checksum_address
 
-db_file_path = "dapp.db"
+db_file_path = "dapp.sqlite"
 
 
 def get_connection():
@@ -36,6 +36,36 @@ def create_token_if_not_exists(connection, token_address, default_total_supply=0
     )
 
 
+def create_pair_if_not_exists(
+    connection, token_address, token_0_address, token_1_address
+):
+    create_token_if_not_exists(connection, token_address)
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO pair (address, token_0_address, token_1_address)
+        VALUES (?, ?, ?)
+        """,
+        (token_address, token_0_address, token_1_address),
+    )
+    return cursor.lastrowid
+
+
+def create_swap(connection, pair_address, token_0_address, token_1_address):
+    create_pair_if_not_exists(
+        connection, pair_address, token_0_address, token_1_address
+    )
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        INSERT INTO swap (pair_address)
+        VALUES (?)
+        """,
+        (pair_address,),
+    )
+    return cursor.lastrowid
+
+
 def stream_from_row(row) -> Stream:
     return Stream(
         stream_id=row[0],
@@ -46,7 +76,7 @@ def stream_from_row(row) -> Stream:
         amount=str_to_int(row[5]),
         token_address=row[6],
         accrued=True if row[7] == 1 else False,
-        pair_address=row[8] if len(row) > 8 else None,
+        swap_id=row[8] if len(row) > 8 else None,
     )
 
 
@@ -155,12 +185,12 @@ def add_stream(connection, stream) -> int:
     create_account_if_not_exists(connection, stream.from_address)
     create_account_if_not_exists(connection, stream.to_address)
     create_token_if_not_exists(connection, stream.token_address)
-    if stream.pair_address is not None:
-        create_token_if_not_exists(connection, stream.pair_address)
+    # if stream.pair_address is not None:
+    #     create_token_if_not_exists(connection, stream.pair_address)
     cursor = connection.cursor()
     cursor.execute(
         """
-        INSERT INTO stream (from_address, to_address, start_block, block_duration, amount, token_address, accrued, pair_address)
+        INSERT INTO stream (from_address, to_address, start_block, block_duration, amount, token_address, accrued, swap_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
@@ -171,7 +201,7 @@ def add_stream(connection, stream) -> int:
             int_to_str(stream.amount),
             stream.token_address,
             1 if stream.accrued else 0,
-            stream.pair_address,
+            stream.swap_id,
         ),
     )
 
@@ -188,6 +218,19 @@ def update_stream_amount_duration(connection, stream_id, block_duration, amount)
         """,
         (block_duration, int_to_str(amount), stream_id),
     )
+
+
+def update_sream_amount(connection, stream_ids_amounts):
+    cursor = connection.cursor()
+    cursor.executemany(
+        """
+        UPDATE stream
+        SET amount = ?
+        WHERE id = ?
+        """,
+        stream_ids_amounts,
+    )
+    return cursor.lastrowid
 
 
 def update_stream_accrued(connection, stream_id, accrued):
@@ -242,6 +285,21 @@ def set_total_supply(connection, token_address: str, total_supply: int):
     )
 
 
+def set_last_block_processed(connection, pair_address: str, last_block_processed: int):
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        UPDATE pair
+        SET last_block_processed = ?
+        WHERE address = ?
+        """,
+        (
+            last_block_processed,
+            pair_address,
+        ),
+    )
+
+
 # Test only
 def stream_test(payload, sender, block_number, connection):
     split_number = int(payload["args"]["split_number"])
@@ -274,7 +332,7 @@ def stream_test(payload, sender, block_number, connection):
     cursor = connection.cursor()
     cursor.executemany(
         """
-                INSERT INTO stream (from_address, to_address, start_block, block_duration, amount, token_address, accrued, pair_address)
+                INSERT INTO stream (from_address, to_address, start_block, block_duration, amount, token_address, accrued, swap_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
         stream_data,
