@@ -2,6 +2,14 @@
 
 Made with ❤️ by [DCA.Monster](https://dca.monster) as part of the Cartesi Grant [DCA.Monster: Modular DeFi 2.0 Components for Cartesi](https://governance.cartesi.io/t/dca-monster-modular-defi-2-0-components-for-cartesi/210)
 
+## Video Tutorial
+
+If you're looking for a more interactive way to learn about our Python Streamable Token implementation for Cartesi Rollups, check out our video tutorial!
+
+[![Watch our video tutorial](http://img.youtube.com/vi/37opGYoXHgU/0.jpg)](https://www.youtube.com/watch?v=37opGYoXHgU "Watch our video tutorial on YouTube")
+
+_Click on the image above to watch the video on YouTube._
+
 ## Introduction
 
 StreamableTokens on Cartesi represent a groundbreaking advancement in blockchain technology. Typically, blockchain applications on Ethereum Virtual Machine (EVM) compatible chains are constrained by computational limits, restricting the scope and efficiency of many potential use cases. However, by leveraging Cartesi's rollups, we're not just overcoming these limitations but also unlocking a realm of possibilities previously unattainable in the blockchain space.
