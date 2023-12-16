@@ -116,7 +116,8 @@ class TestAmm(unittest.TestCase):
     @patch("requests.post")
     def test_swap(self, mock_post):
         current_block = 0
-        # Test Add liquidity
+        swap_duration = 10000
+
         self.amm.add_liquidity(
             self.token_one_address,
             self.token_two_address,
@@ -140,27 +141,20 @@ class TestAmm(unittest.TestCase):
             amount_out_min=0,
             path=[self.token_one_address, self.token_two_address],
             start=current_block + 100,
-            duration=10000,
+            duration=swap_duration,
             to=self.trader_address,
             msg_sender=self.trader_address,
             current_block=current_block,
         )
 
-        current_block += 10100
+        current_block += swap_duration + 100
 
-        hook(
-            self.connection,
-            self.token_one_address,
-            self.trader_address,
-            current_block,
-        )
-
-        print(token_two_out)
-        actual_balance = self.token_two.balance_of(self.trader_address, current_block)
+        actual_balance = self.token_two.future_balance_of(self.trader_address)
 
         difference = token_two_out / actual_balance
-        print(actual_balance)
-        print((1 - difference) * 100)
+
+        # There is a difference due to roundings every block, it's always less than the number of blocks
+        assert difference < swap_duration
 
 
 if __name__ == "__main__":

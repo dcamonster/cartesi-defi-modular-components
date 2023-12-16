@@ -9,8 +9,8 @@ db_file_path = "dapp.sqlite"
 def get_connection():
     conn = sqlite3.connect(db_file_path)
     cursor = conn.cursor()
-    # cursor.execute("PRAGMA foreign_keys = ON")
-    # cursor.execute("PRAGMA journal_mode = WAL")
+    cursor.execute("PRAGMA foreign_keys = ON")
+    cursor.execute("PRAGMA journal_mode = WAL")
     return conn
 
 
@@ -109,6 +109,45 @@ def get_wallet_non_accrued_streamed_amts(
             streamed_amount = (amount * elapsed) // block_duration
 
         yield (streamed_amount if to_address == account_address else -streamed_amount)
+
+
+def get_wallet_streams(connection, account_address, token_address) -> List[Stream]:
+    create_account_if_not_exists(connection, account_address)
+    create_token_if_not_exists(connection, token_address)
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        SELECT * FROM stream
+        WHERE (from_address = ? OR to_address = ?) AND token_address = ?
+        """,
+        (account_address, account_address, token_address),
+    )
+    rows = cursor.fetchall()
+
+    streams = []
+    for row in rows:
+        streams.append(stream_from_row(row))
+
+    return streams
+
+
+def get_max_end_block_for_wallet(connection, account_address):
+    create_account_if_not_exists(connection, account_address)
+
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        SELECT MAX(start_block + block_duration)
+        FROM stream
+        WHERE (from_address = ? OR to_address = ?)
+        """,
+        (account_address, account_address),
+    )
+
+    result = cursor.fetchone()
+    max_end_block = result[0] if result else 0
+
+    return max_end_block
 
 
 def get_wallet_endend_streams(

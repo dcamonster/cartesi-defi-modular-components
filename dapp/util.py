@@ -12,6 +12,8 @@ from eth_utils import is_hex_address, to_checksum_address, is_checksum_address
 # Constants
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 MINIMUM_LIQUIDITY = 100000
+MAX_INT64 = 2**63 - 1
+USER_FEES = 0  # per 1000
 
 
 # Custom Decoder Classes
@@ -166,7 +168,7 @@ def get_amount_out(amount_in, reserve_in, reserve_out):
     if reserve_in <= 0 or reserve_out <= 0:
         raise ValueError("AMM: INSUFFICIENT_LIQUIDITY")
 
-    amount_in_with_fee = amount_in * 997
+    amount_in_with_fee = amount_in * (1000 - USER_FEES)
     numerator = amount_in_with_fee * reserve_out
     denominator = reserve_in * 1000 + amount_in_with_fee
     amount_out = numerator // denominator
