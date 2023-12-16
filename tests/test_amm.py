@@ -4,9 +4,8 @@ from unittest.mock import MagicMock, Mock, patch
 import requests
 from dapp.amm import AMM
 from dapp.db import get_connection
-from dapp.hook import hook
 from dapp.pair import Pair
-from dapp.streamabletoken import StreamableToken
+from dapp.streamabletoken import StreamableToken, hook
 from dapp.util import get_amount_out
 from sqlite import initialise_db
 from tests.utils import calculate_total_supply_token
@@ -147,19 +146,20 @@ class TestAmm(unittest.TestCase):
             current_block=current_block,
         )
 
+        current_block += 10100
+
         hook(
             self.connection,
             self.token_one_address,
             self.trader_address,
-            current_block + 20000,
+            current_block,
         )
 
         print(token_two_out)
-        actual_balance = self.token_two.balance_of(
-            self.trader_address, current_block + 300
-        )
+        actual_balance = self.token_two.balance_of(self.trader_address, current_block)
 
         difference = token_two_out / actual_balance
+        print(actual_balance)
         print((1 - difference) * 100)
 
 

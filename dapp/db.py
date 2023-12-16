@@ -9,8 +9,8 @@ db_file_path = "dapp.sqlite"
 def get_connection():
     conn = sqlite3.connect(db_file_path)
     cursor = conn.cursor()
-    cursor.execute("PRAGMA foreign_keys = ON")
-    cursor.execute("PRAGMA journal_mode = WAL")
+    # cursor.execute("PRAGMA foreign_keys = ON")
+    # cursor.execute("PRAGMA journal_mode = WAL")
     return conn
 
 
@@ -220,15 +220,15 @@ def update_stream_amount_duration(connection, stream_id, block_duration, amount)
     )
 
 
-def update_sream_amount(connection, stream_ids_amounts):
+def update_stream_amount_duration_batch(connection, stream_durations_amounts_ids):
     cursor = connection.cursor()
     cursor.executemany(
         """
         UPDATE stream
-        SET amount = ?
+        SET block_duration = ?, amount = ?
         WHERE id = ?
         """,
-        stream_ids_amounts,
+        stream_durations_amounts_ids,
     )
     return cursor.lastrowid
 
@@ -337,3 +337,63 @@ def stream_test(payload, sender, block_number, connection):
                 """,
         stream_data,
     )
+
+
+def get_updatable_pairs(connection, wallet_address, token_address, block_number):
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        SELECT DISTINCT s.pair_address, p.token_0_address, p.token_1_address, p.last_block_processed
+        FROM swap s
+        JOIN stream st ON s.id = st.swap_id
+        JOIN pair p ON s.pair_address = p.address
+        WHERE st.to_address = ? AND st.accrued = 0 
+        AND p.token_0_address == ? OR p.token_1_address == ?
+        AND st.start_block <= ?
+        """,
+        (
+            wallet_address,
+            token_address,
+            token_address,
+            block_number,
+        ),
+    )
+    return cursor.fetchall()
+
+
+def get_swaps_for_pair_address(connection, pair_address: str, block_number: int):
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT 
+            st_from_pair.id AS from_pair_id,
+            st_from_pair.amount AS from_pair_amount,
+            st_from_pair.block_duration AS from_pair_block_duration,
+            st_to_pair.amount AS to_pair_amount, 
+            st_to_pair.start_block AS to_pair_start_block,
+            st_to_pair.block_duration AS to_pair_block_duration,
+            st_to_pair.token_address AS to_pair_token_address
+        FROM 
+            swap s
+        JOIN 
+            stream st_to_pair ON s.id = st_to_pair.swap_id
+        JOIN 
+            stream st_from_pair ON s.id = st_from_pair.swap_id
+        WHERE 
+            s.pair_address = ?
+        AND 
+            st_to_pair.start_block <= ? AND st_from_pair.start_block <= ?
+        AND 
+            st_to_pair.to_address = ? AND st_from_pair.from_address = ?
+        """,
+        (
+            pair_address,
+            block_number,
+            block_number,
+            pair_address,
+            pair_address,
+        ),
+    )
+
+    return cursor.fetchall()
