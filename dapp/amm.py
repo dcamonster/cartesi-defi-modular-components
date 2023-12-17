@@ -202,7 +202,12 @@ class AMM:
 
         pair = Pair(self.connection, path[0], path[1])
 
-        (token_0, token_1) = pair.get_tokens()
+        (token_0, token_1) = (
+            StreamableToken(self.connection, path[0]),
+            StreamableToken(self.connection, path[1]),
+        )
+
+        StreamableToken(self.connection, path[0])
 
         swap_id = create_swap(
             self.connection,
