@@ -17,10 +17,10 @@ class Pair(StreamableToken):
             connection, _token1 if token1 == _token1 else _token0
         )
 
-    def get_reserves(self, at_block):
+    def get_reserves(self, at_timestamp):
         return (
-            self.token0.balance_of(super().get_address(), at_block),
-            self.token1.balance_of(super().get_address(), at_block),
+            self.token0.balance_of(super().get_address(), at_timestamp),
+            self.token1.balance_of(super().get_address(), at_timestamp),
         )
 
     def get_tokens(self):

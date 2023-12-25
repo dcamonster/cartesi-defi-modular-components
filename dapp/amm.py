@@ -17,9 +17,9 @@ class AMM:
     def __init__(self, connection):
         self.connection = connection
 
-    def get_reserves(self, token_a, token_b, at_block):
+    def get_reserves(self, token_a, token_b, at_timestamp):
         pair = Pair(self.connection, token_a, token_b)
-        (reserve_0, reserve_1) = pair.get_reserves(at_block)
+        (reserve_0, reserve_1) = pair.get_reserves(at_timestamp)
         return (
             (reserve_0, reserve_1)
             if token_a == pair.get_tokens()[0]
@@ -34,9 +34,9 @@ class AMM:
         token_b_desired,
         token_a_min,
         token_b_min,
-        current_block,
+        current_timestamp,
     ):
-        (reserve_a, reserve_b) = self.get_reserves(token_a, token_b, current_block)
+        (reserve_a, reserve_b) = self.get_reserves(token_a, token_b, current_timestamp)
 
         if reserve_a == 0 and reserve_b == 0:
             amount_a = int(token_a_desired)
@@ -66,11 +66,11 @@ class AMM:
         token_b_min,
         to,
         msg_sender,
-        current_block,
+        current_timestamp,
     ):
         pair = Pair(self.connection, token_a, token_b)
         pair_address = pair.get_address()
-        (reserve_a, reserve_b) = self.get_reserves(token_a, token_b, current_block)
+        (reserve_a, reserve_b) = self.get_reserves(token_a, token_b, current_timestamp)
 
         (amount_a, amount_b) = self._add_liquidity(
             token_a,
@@ -79,24 +79,24 @@ class AMM:
             token_b_desired,
             token_a_min,
             token_b_min,
-            current_block,
+            current_timestamp,
         )
 
         StreamableToken(self.connection, token_a).transfer(
             receiver=pair_address,
             amount=amount_a,
             duration=0,
-            block_start=current_block,
+            start_timestamp=current_timestamp,
             sender=msg_sender,
-            current_block=current_block,
+            current_timestamp=current_timestamp,
         )
         StreamableToken(self.connection, token_b).transfer(
             receiver=pair_address,
             amount=amount_b,
             duration=0,
-            block_start=current_block,
+            start_timestamp=current_timestamp,
             sender=msg_sender,
-            current_block=current_block,
+            current_timestamp=current_timestamp,
         )
 
         total_supply = pair.get_stored_total_supply()
@@ -128,7 +128,7 @@ class AMM:
         amount_b_min,
         to,
         msg_sender,
-        current_block,
+        current_timestamp,
     ):
         pair = Pair(self.connection, token_a, token_b)
         pair_address = pair.get_address()
@@ -136,12 +136,12 @@ class AMM:
             receiver=pair_address,
             amount=liquidity,
             duration=0,
-            block_start=current_block,
+            start_timestamp=current_timestamp,
             sender=msg_sender,
-            current_block=current_block,
+            current_timestamp=current_timestamp,
         )
 
-        (reserve_0, reserve_1) = pair.get_reserves(current_block)
+        (reserve_0, reserve_1) = pair.get_reserves(current_timestamp)
         (token_0, token_1) = pair.get_tokens()
 
         total_supply = pair.get_stored_total_supply()
@@ -152,24 +152,24 @@ class AMM:
         assert amount_0 >= 0, "AMM: INSUFFICIENT_LIQUIDITY_BURNED"
         assert amount_1 >= 0, "AMM: INSUFFICIENT_LIQUIDITY_BURNED"
 
-        pair.burn(amount=liquidity, sender=pair_address, current_block=current_block)
+        pair.burn(amount=liquidity, sender=pair_address, current_timestamp=current_timestamp)
 
         token_0.transfer(
             receiver=to,
             amount=amount_0,
             duration=0,
-            block_start=current_block,
+            start_timestamp=current_timestamp,
             sender=pair_address,
-            current_block=current_block,
+            current_timestamp=current_timestamp,
         )
 
         token_1.transfer(
             receiver=to,
             amount=amount_1,
             duration=0,
-            block_start=current_block,
+            start_timestamp=current_timestamp,
             sender=pair_address,
-            current_block=current_block,
+            current_timestamp=current_timestamp,
         )
 
         (amount_a, amount_b) = (
@@ -190,15 +190,15 @@ class AMM:
         duration,
         to,
         msg_sender,
-        current_block,
+        current_timestamp,
     ):
         """
         Swap exact tokens for tokens
         """
         assert len(path) == 2, "AMM: INVALID_PATH"
         if start == 0:
-            start = current_block
-        assert start >= current_block, "AMM: INVALID_START_TIME"
+            start = current_timestamp
+        assert start >= current_timestamp, "AMM: INVALID_START_TIME"
 
         pair = Pair(self.connection, path[0], path[1])
 
@@ -227,18 +227,18 @@ class AMM:
                 receiver=pair.get_address(),
                 amount=amount_in,
                 duration=0,
-                block_start=current_block,
+                start_timestamp=current_timestamp,
                 sender=msg_sender,
-                current_block=current_block,
+                current_timestamp=current_timestamp,
                 swap_id=swap_id,
             )
             token_1.transfer_from(
                 receiver=to,
                 amount=amount_out,
                 duration=0,
-                block_start=current_block,
+                start_timestamp=current_timestamp,
                 sender=pair.get_address(),
-                current_block=current_block,
+                current_timestamp=current_timestamp,
                 swap_id=swap_id,
             )
         else:
@@ -246,17 +246,17 @@ class AMM:
                 receiver=pair.get_address(),
                 amount=amount_in,
                 duration=duration,
-                block_start=start,
+                start_timestamp=start,
                 sender=msg_sender,
-                current_block=current_block,
+                current_timestamp=current_timestamp,
                 swap_id=swap_id,
             )
             token_1.transfer(
                 receiver=to,
                 amount=0,
                 duration=0,
-                block_start=start,
+                start_timestamp=start,
                 sender=pair.get_address(),
-                current_block=current_block,
+                current_timestamp=current_timestamp,
                 swap_id=swap_id,
             )

@@ -38,7 +38,7 @@ def initialise_db():
             address TEXT PRIMARY KEY,
             token_0_address TEXT NOT NULL,
             token_1_address TEXT NOT NULL,
-            last_block_processed INTEGER NOT NULL DEFAULT 0,
+            last_timestamp_processed INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (address) REFERENCES token(address)
             FOREIGN KEY (token_0_address) REFERENCES token(address)
             FOREIGN KEY (token_1_address) REFERENCES token(address)
@@ -75,8 +75,8 @@ def initialise_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             from_address TEXT NOT NULL,
             to_address TEXT NOT NULL,
-            start_block INTEGER NOT NULL,
-            block_duration INTEGER NOT NULL,
+            start_timestamp INTEGER NOT NULL,
+            duration INTEGER NOT NULL,
             amount TEXT NOT NULL,
             token_address TEXT NOT NULL,
             accrued INTEGER NOT NULL,

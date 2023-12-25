@@ -83,12 +83,12 @@ def with_checksum_address(func):
 
 def process_streams_before(func):
     def wrapper(self, *args, **kwargs):
-        if not "current_block" in kwargs or not "sender" in kwargs:
-            raise ValueError("Current block and sender must be provided.")
-        current_block = kwargs["current_block"]
+        if not "current_timestamp" in kwargs or not "sender" in kwargs:
+            raise ValueError("current_timestamp and sender must be provided.")
+        current_timestamp = kwargs["current_timestamp"]
         sender = kwargs["sender"]
 
-        self.process_streams(sender, current_block)
+        self.process_streams(sender, current_timestamp)
 
         return func(self, *args, **kwargs)
 

@@ -1,32 +1,35 @@
 from dapp.db import (
     get_swaps_for_pair_address,
     get_updatable_pairs,
-    set_last_block_processed,
+    set_last_timestamp_processed,
     update_stream_amount_duration_batch,
 )
 from dapp.util import get_amount_out, int_to_str, str_to_int, with_checksum_address
 
 
 @with_checksum_address
-def hook(connection, token_address, wallet, to_block):
+def hook(connection, token_address, wallet, to_timestamp):
     from dapp.streamabletoken import StreamableToken
-    updatable_pairs = get_updatable_pairs(connection, wallet, token_address, to_block)
+
+    updatable_pairs = get_updatable_pairs(
+        connection, wallet, token_address, to_timestamp
+    )
     for (
         pair_address,
         token_0_address,
         token_1_address,
-        last_block_processed,
+        last_timestamp_processed,
     ) in updatable_pairs:
         (reserve_in, reserve_out) = (
             StreamableToken(connection, token_0_address).balance_of(
-                pair_address, last_block_processed
+                pair_address, last_timestamp_processed
             ),
             StreamableToken(connection, token_1_address).balance_of(
-                pair_address, last_block_processed
+                pair_address, last_timestamp_processed
             ),
         )
 
-        swaps = get_swaps_for_pair_address(connection, pair_address, to_block)
+        swaps = get_swaps_for_pair_address(connection, pair_address, to_timestamp)
 
         # Add swap rate to swaps
         swaps = [
@@ -39,7 +42,7 @@ def hook(connection, token_address, wallet, to_block):
             for swap in swaps
         }
 
-        for block in range(last_block_processed, to_block + 1):
+        for timestamp in range(last_timestamp_processed, to_timestamp + 1):
 
             def sum_swaps_token(token_address):
                 return sum(
@@ -47,8 +50,8 @@ def hook(connection, token_address, wallet, to_block):
                         swap[7]
                         for swap in swaps
                         if swap[6] == token_address
-                        and swap[4] <= block
-                        and swap[4] + swap[5] > block
+                        and swap[4] <= timestamp
+                        and swap[4] + swap[5] > timestamp
                     ]
                 )
 
@@ -75,7 +78,7 @@ def hook(connection, token_address, wallet, to_block):
 
             # then update swaps
             for swap in swaps:
-                if swap[4] > block or swap[4] + swap[5] <= block:
+                if swap[4] > timestamp or swap[4] + swap[5] <= timestamp:
                     continue
                 if swap[6] == token_0_address:
                     streams_to_update[swap[0]]["amount"] += (
@@ -97,4 +100,4 @@ def hook(connection, token_address, wallet, to_block):
                 for key, value in streams_to_update.items()
             ],
         )
-        set_last_block_processed(connection, pair_address, to_block)
+        set_last_timestamp_processed(connection, pair_address, to_timestamp)

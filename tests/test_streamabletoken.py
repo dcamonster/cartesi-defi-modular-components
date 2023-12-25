@@ -55,14 +55,14 @@ class TestStreamableToken(unittest.TestCase):
 
     def test_burning_tokens(self):
         # Test burning tokens
-        current_block = 100
+        current_timestamp = 100
         mint_amount = 1000
         burn_amount = 500
         self.token.mint(mint_amount, self.sender_address)
         self.token.burn(
-            amount=burn_amount, sender=self.sender_address, current_block=current_block
-        )  # Assuming current_block is 100
-        balance = self.token.balance_of(self.sender_address, current_block)
+            amount=burn_amount, sender=self.sender_address, current_timestamp=current_timestamp
+        )  # Assuming current_timestamp is 100
+        balance = self.token.balance_of(self.sender_address, current_timestamp)
         total_supply = self.token.get_stored_total_supply()
         self.assertEqual(
             balance, mint_amount - burn_amount, "Balance after burn is incorrect."
@@ -79,32 +79,32 @@ class TestStreamableToken(unittest.TestCase):
         self.token.mint(mint_amount, self.sender_address)
         with self.assertRaises(AssertionError):
             self.token.burn(
-                amount=mint_amount + 1, sender=self.sender_address, current_block=100
+                amount=mint_amount + 1, sender=self.sender_address, current_timestamp=100
             )
 
     def test_transfer_from(self):
         amount = 100
-        block_duration = 0
-        current_block = 0
-        start_block = 0
+        duration = 0
+        current_timestamp = 0
+        start_timestamp = 0
 
         self.token.mint(100, self.sender_address)
 
         self.token.transfer(
             receiver=self.receiver_address,
             amount=amount,
-            duration=block_duration,
-            block_start=start_block,
+            duration=duration,
+            start_timestamp=start_timestamp,
             sender=self.sender_address,
-            current_block=current_block,
+            current_timestamp=current_timestamp,
         )
 
         self.assertEqual(
-            self.token.balance_of(self.sender_address, current_block),
+            self.token.balance_of(self.sender_address, current_timestamp),
             0,
         )
         self.assertEqual(
-            self.token.balance_of(self.receiver_address, current_block),
+            self.token.balance_of(self.receiver_address, current_timestamp),
             amount,
         )
         self.assertEqual(
@@ -114,9 +114,9 @@ class TestStreamableToken(unittest.TestCase):
 
     def test_transfer_from_stream(self):
         amount = 100
-        block_duration = 1000
-        current_block = 0
-        start_block = 0
+        duration = 1000
+        current_timestamp = 0
+        start_timestamp = 0
 
         self.token.mint(100, self.sender_address)
 
@@ -132,23 +132,23 @@ class TestStreamableToken(unittest.TestCase):
         stream_id = self.token.transfer(
             receiver=self.receiver_address,
             amount=amount,
-            duration=block_duration,
-            block_start=start_block,
+            duration=duration,
+            start_timestamp=start_timestamp,
             sender=self.sender_address,
-            current_block=current_block,
+            current_timestamp=current_timestamp,
         )
 
         # After half the duration, the receiver should have half the amount of tokens and the sender the other half
         self.assertEqual(
             self.token.balance_of(
-                self.receiver_address, current_block + block_duration / 2
+                self.receiver_address, current_timestamp + duration / 2
             ),
             amount / 2,
         )
 
         self.assertEqual(
             self.token.balance_of(
-                self.sender_address, current_block + block_duration / 2
+                self.sender_address, current_timestamp + duration / 2
             ),
             amount / 2,
         )
@@ -156,20 +156,20 @@ class TestStreamableToken(unittest.TestCase):
         # After the duration, the receiver should have all the tokens and the sender none
         self.assertEqual(
             self.token.balance_of(
-                self.receiver_address, current_block + block_duration
+                self.receiver_address, current_timestamp + duration
             ),
             amount,
         )
 
         self.assertEqual(
-            self.token.balance_of(self.sender_address, current_block + block_duration),
+            self.token.balance_of(self.sender_address, current_timestamp + duration),
             0,
         )
 
     def test_transfer_more_than_balance(self):
-        current_block = 0
-        start_block = 0
-        block_duration = 1000
+        current_timestamp = 0
+        start_timestamp = 0
+        duration = 1000
         amount = 100
 
         self.token.mint(amount, self.sender_address)
@@ -180,10 +180,10 @@ class TestStreamableToken(unittest.TestCase):
                 self.token.transfer(
                     receiver=self.receiver_address,
                     amount=amount * 2,
-                    duration=block_duration,
-                    block_start=start_block,
+                    duration=duration,
+                    start_timestamp=start_timestamp,
                     sender=self.sender_address,
-                    current_block=current_block,
+                    current_timestamp=current_timestamp,
                 )
             except Exception as e:
                 self.exception = e
@@ -195,24 +195,24 @@ class TestStreamableToken(unittest.TestCase):
         self.token.transfer(
             receiver=self.receiver_address,
             amount=amount / 2,
-            duration=block_duration,
-            block_start=start_block,
+            duration=duration,
+            start_timestamp=start_timestamp,
             sender=self.sender_address,
-            current_block=current_block,
+            current_timestamp=current_timestamp,
         )
 
         # Simulate the passage of half the duration
-        current_block += block_duration / 2
+        current_timestamp += duration / 2
 
         with self.assertRaises(Exception) as context:
             try:
                 self.token.transfer(
                     receiver=self.receiver_address,
                     amount=amount / 2 + 1,  # Send more than the remaining balance
-                    duration=block_duration,
-                    block_start=current_block + 100,  # Start block is in the future
+                    duration=duration,
+                    start_timestamp=current_timestamp + 100,  # Start timestamp is in the future
                     sender=self.sender_address,
-                    current_block=current_block,
+                    current_timestamp=current_timestamp,
                 )
             except Exception as e:
                 self.exception = e
@@ -225,16 +225,16 @@ class TestStreamableToken(unittest.TestCase):
                 raise e
 
     def test_stream_with_zero_duration(self):
-        # Test adding a stream with a duration of zero blocks (should raise an exception)
+        # Test adding a stream with a duration of zero (should raise an exception)
         self.token.mint(100, self.sender_address)
 
         self.token.transfer(
             receiver=self.receiver_address,
             amount=50,
             duration=0,
-            block_start=0,
+            start_timestamp=0,
             sender=self.sender_address,
-            current_block=0,
+            current_timestamp=0,
         )
 
         assert self.token.balance_of(self.receiver_address, 0) == 50
@@ -249,9 +249,9 @@ class TestStreamableToken(unittest.TestCase):
             receiver=self.receiver_address,
             amount=mint_amount,
             duration=long_duration,
-            block_start=0,
+            start_timestamp=0,
             sender=self.sender_address,
-            current_block=0,
+            current_timestamp=0,
         )
         self.assertTrue(isinstance(stream_id, int), "Stream ID should be an integer.")
 
