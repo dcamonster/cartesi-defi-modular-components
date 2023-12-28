@@ -37,7 +37,7 @@ class TestAmm(unittest.TestCase):
         self.initial_balance = 100 * 10**18
         self.token_one.mint(self.initial_balance, self.lp_address)
         self.token_two.mint(self.initial_balance, self.lp_address)
-        self.current_block = 0
+        self.current_timestamp = 0
 
     def add_liquidity_lp(self, amount_one, amount_two):
         self.token_one.mint(amount_one, self.lp_address)
@@ -76,7 +76,7 @@ class TestAmm(unittest.TestCase):
             duration=duration,
             to=from_address,
             msg_sender=from_address,
-            current_block=self.current_block,
+            current_timestamp=self.current_timestamp,
         )
 
     def tearDown(self):
@@ -103,14 +103,14 @@ class TestAmm(unittest.TestCase):
             0,
             self.lp_address,
             self.lp_address,
-            self.current_block,
+            self.current_timestamp,
         )
 
         token_one_balance = self.token_one.balance_of(
-            self.lp_address, self.current_block
+            self.lp_address, self.current_timestamp
         )
         token_two_balance = self.token_two.balance_of(
-            self.lp_address, self.current_block
+            self.lp_address, self.current_timestamp
         )
 
         self.assertEqual(
@@ -124,7 +124,7 @@ class TestAmm(unittest.TestCase):
             "Token two balance is less than 0 after adding liquidity.",
         )
 
-        self.current_block += 1
+        self.current_timestamp += 1
 
         # Test Remove liquidity
         self.amm.remove_liquidity(
@@ -135,15 +135,15 @@ class TestAmm(unittest.TestCase):
             0,
             self.lp_address,
             self.lp_address,
-            self.current_block,
+            self.current_timestamp,
         )
 
         # Check if the stored balances after removing liquidity are not less than 0
         token_one_balance_after = self.token_one.balance_of(
-            self.lp_address, self.current_block
+            self.lp_address, self.current_timestamp
         )
         token_two_balance_after = self.token_two.balance_of(
-            self.lp_address, self.current_block
+            self.lp_address, self.current_timestamp
         )
 
         self.assertGreaterEqual(
@@ -170,13 +170,13 @@ class TestAmm(unittest.TestCase):
             0,
             self.lp_address,
             self.lp_address,
-            self.current_block,
+            self.current_timestamp,
         )
 
         self.token_one.mint(self.initial_balance, self.trader_address)
 
         (token_one_reserve, token_two_reserve) = self.pair.get_reserves(
-            self.current_block
+            self.current_timestamp
         )
         token_two_out = get_amount_out(
             self.initial_balance, token_one_reserve, token_two_reserve
@@ -185,20 +185,20 @@ class TestAmm(unittest.TestCase):
             amount_in=self.initial_balance,
             amount_out_min=0,
             path=[self.token_one_address, self.token_two_address],
-            start=self.current_block + 100,
+            start=self.current_timestamp + 100,
             duration=swap_duration,
             to=self.trader_address,
             msg_sender=self.trader_address,
-            current_block=self.current_block,
+            current_timestamp=self.current_timestamp,
         )
 
-        self.current_block += swap_duration + 100
+        self.current_timestamp += swap_duration + 100
 
         actual_balance = self.token_two.future_balance_of(self.trader_address)
 
         difference = token_two_out / actual_balance
 
-        # There is a difference due to roundings every block, it's always less than the number of blocks
+        # There is a difference due to roundings every timestamp, it's always less than the number of timestamps
         assert difference < swap_duration
 
     @patch("requests.post")
@@ -207,7 +207,7 @@ class TestAmm(unittest.TestCase):
         self.add_liquidity_lp(self.initial_balance, self.initial_balance)
 
         swap_duration = 10000
-        swap_start_trader = self.current_block + 100
+        swap_start_trader = self.current_timestamp + 100
 
         # Trader starts a swap
         trader_swap_amt = 30 * 10**18
@@ -220,7 +220,7 @@ class TestAmm(unittest.TestCase):
         )
 
         future_balance_token_two_trader = self.token_two.future_balance_of(
-            self.trader_address, self.current_block + swap_duration
+            self.trader_address, self.current_timestamp + swap_duration
         )
 
         # Another user trades the same pair in the future affecting the trader's swap at some point
@@ -235,7 +235,7 @@ class TestAmm(unittest.TestCase):
         )
 
         future_balance_token_two_trader_mod = self.token_two.future_balance_of(
-            self.trader_address, self.current_block + swap_duration
+            self.trader_address, self.current_timestamp + swap_duration
         )
 
         

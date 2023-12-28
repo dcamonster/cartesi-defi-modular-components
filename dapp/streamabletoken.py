@@ -4,7 +4,7 @@ from dapp.db import (
     add_stream,
     delete_stream_by_id,
     get_balance,
-    get_max_end_block_for_wallet,
+    get_max_end_timestamp_for_wallet,
     get_stream_by_id,
     get_total_supply,
     get_wallet_endend_streams,
@@ -41,10 +41,10 @@ class StreamableToken:
         return set_balance(self._connection, wallet, self._address, amount)
 
     def get_wallet_endend_streams(
-        self, wallet: str, current_block: int
+        self, wallet: str, current_timestamp: int
     ) -> List[Stream]:
         return get_wallet_endend_streams(
-            self._connection, wallet, self._address, current_block
+            self._connection, wallet, self._address, current_timestamp
         )
 
     def set_stream_accrued(self, stream_id: int):
@@ -62,15 +62,17 @@ class StreamableToken:
     def set_stored_total_supply(self, amount: int):
         return set_total_supply(self._connection, self._address, amount)
 
-    def process_streams(self, account_address: str, current_block: int):
-        hook(self._connection, self._address, account_address, current_block)
+    def process_streams(self, account_address: str, current_timestamp: int):
+        hook(self._connection, self._address, account_address, current_timestamp)
 
-        ended_streams = self.get_wallet_endend_streams(account_address, current_block)
+        ended_streams = self.get_wallet_endend_streams(
+            account_address, current_timestamp
+        )
 
         balance = self.get_stored_balance(account_address)
         for stream in ended_streams:
             self.set_stream_accrued(stream.id)
-            streamed_amount = stream.streamed_amt(current_block)
+            streamed_amount = stream.streamed_amt(current_timestamp)
             if stream.from_address == account_address:
                 balance -= streamed_amount
                 balance_to = (
@@ -96,20 +98,22 @@ class StreamableToken:
         self.set_stored_total_supply(old_total_supply + amount)
 
     @process_streams_before
-    def burn(self, amount: int, sender: str, current_block: int):
-        assert current_block is not None, "Current block must be provided."
-        assert self.balance_of(sender, current_block) >= amount, "Insufficient balance."
+    def burn(self, amount: int, sender: str, current_timestamp: int):
+        assert current_timestamp is not None, "Current timestamp must be provided."
+        assert (
+            self.balance_of(sender, current_timestamp) >= amount
+        ), "Insufficient balance."
 
         initial_supply = self.get_stored_total_supply()
         self.set_stored_total_supply(initial_supply - amount)
         return self.set_stored_balance(sender, self.get_stored_balance(sender) - amount)
 
-    def balance_of(self, account_address: str, at_block: int, count_received=True):
+    def balance_of(self, account_address: str, at_timestamp: int, count_received=True):
         address_or_raise(account_address)
         balance = self.get_stored_balance(account_address)
 
         streamed_amounts = get_wallet_non_accrued_streamed_amts(
-            self._connection, account_address, self._address, at_block
+            self._connection, account_address, self._address, at_timestamp
         )
 
         balance += sum(
@@ -118,17 +122,17 @@ class StreamableToken:
 
         return balance
 
-    def future_balance_of(self, account_address: str, future_block=None):
+    def future_balance_of(self, account_address: str, future_timestamp=None):
         address_or_raise(account_address)
         self._connection.commit()
         try:
-            max_block = (
-                future_block
-                if future_block
-                else get_max_end_block_for_wallet(self._connection, account_address)
+            max_timestamp = (
+                future_timestamp
+                if future_timestamp
+                else get_max_end_timestamp_for_wallet(self._connection, account_address)
             )
-            hook(self._connection, self._address, account_address, max_block)
-            balance = self.balance_of(account_address, max_block)
+            hook(self._connection, self._address, account_address, max_timestamp)
+            balance = self.balance_of(account_address, max_timestamp)
         finally:
             self._connection.rollback()
 
@@ -138,16 +142,16 @@ class StreamableToken:
         address_or_raise(account_address)
         return get_wallet_streams(self._connection, account_address, self._address)
 
-    def future_get_streams(self, account_address: str, future_block=None):
+    def future_get_streams(self, account_address: str, future_timestamp=None):
         address_or_raise(account_address)
         self._connection.commit()
         try:
-            max_block = (
-                future_block
-                if future_block
-                else get_max_end_block_for_wallet(self._connection, account_address)
+            max_timestamp = (
+                future_timestamp
+                if future_timestamp
+                else get_max_end_timestamp_for_wallet(self._connection, account_address)
             )
-            hook(self._connection, self._address, account_address, max_block)
+            hook(self._connection, self._address, account_address, max_timestamp)
             streams = self.get_streams(account_address)
         finally:
             self._connection.rollback()
@@ -160,20 +164,22 @@ class StreamableToken:
         receiver: str,
         amount: int,
         duration: int,
-        block_start: int,
+        start_timestamp: int,
         sender: str,
-        current_block: int,
+        current_timestamp: int,
         swap_id: Optional[int] = None,
     ) -> int:
         address_or_raise(receiver)
-        block_start = current_block if block_start == 0 else block_start
-        assert block_start >= current_block, "Start block must be in the future."
+        start_timestamp = current_timestamp if start_timestamp == 0 else start_timestamp
+        assert (
+            start_timestamp >= current_timestamp
+        ), "Start timestamp must be in the future."
         assert duration >= 0, "Duration must be positive."
         assert sender != receiver, "Sender and receiver must be different."
         assert amount >= 0, "Amount must be positive."
 
         future_balance_after_send = self.balance_of(
-            sender, block_start + duration, False
+            sender, start_timestamp + duration, False
         )
         assert (
             future_balance_after_send >= amount
@@ -184,8 +190,8 @@ class StreamableToken:
                 stream_id="",
                 from_address=sender,
                 to_address=receiver,
-                start_block=block_start,
-                block_duration=duration,
+                start_timestamp=start_timestamp,
+                duration=duration,
                 amount=amount,
                 token_address=self.get_address(),
                 accrued=False,
@@ -194,21 +200,21 @@ class StreamableToken:
         )
 
     @process_streams_before
-    def cancel_stream(self, stream_id: int, sender: str, current_block: int):
+    def cancel_stream(self, stream_id: int, sender: str, current_timestamp: int):
         stream = self.get_stream_by_id(stream_id)
         assert stream is not None, "Stream not found."
         assert stream.from_address == sender, "Sender is not the stream owner."
         assert (
-            stream.start_block + stream.block_duration >= current_block
+            stream.start_timestamp + stream.duration >= current_timestamp
         ), "Stream is already sent."
 
-        if stream.start_block > current_block:
+        if stream.start_timestamp > current_timestamp:
             delete_stream_by_id(self._connection, stream_id)
         else:
-            streamed = stream.streamed_amt(current_block)
+            streamed = stream.streamed_amt(current_timestamp)
             update_stream_amount_duration(
                 self._connection,
                 stream_id,
-                current_block - stream.start_block,
+                current_timestamp - stream.start_timestamp,
                 streamed,
             )

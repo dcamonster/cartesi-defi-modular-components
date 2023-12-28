@@ -97,19 +97,19 @@ def handle_action(data, connection):
         payload = json.loads(str_payload)
 
         sender = data["metadata"]["msg_sender"]
-        block_number = data["metadata"]["block_number"]
+        timestamp = data["metadata"]["timestamp"]
 
         if payload["method"] == "stream":
             StreamableToken(connection, payload["args"]["token"]).transfer(
                 receiver=payload["args"]["receiver"],
                 amount=int(payload["args"]["amount"]),
                 duration=int(payload["args"]["duration"]),
-                block_start=int(payload["args"]["start"]),
+                start_timestamp=int(payload["args"]["start"]),
                 sender=sender,
-                current_block=block_number,
+                current_timestamp=timestamp,
             )
         elif payload["method"] == "stream_test":  # Just for testing purposes
-            stream_test(payload, sender, block_number, connection)
+            stream_test(payload, sender, timestamp, connection)
         elif payload["method"] == "withdraw":
             token_address = payload["args"]["token"]
             token = StreamableToken(connection, payload["args"]["token"])
@@ -117,7 +117,7 @@ def handle_action(data, connection):
             token.burn(
                 amount=amount,
                 sender=sender,
-                current_block=block_number,
+                current_timestamp=timestamp,
             )
             # Encode a transfer function call that returns the amount back to the depositor
             transfer_payload = TRANSFER_FUNCTION_SELECTOR + encode(
