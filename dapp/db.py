@@ -1,9 +1,10 @@
+import os
 import sqlite3
 from typing import List
 from dapp.stream import Stream
 from dapp.util import int_to_str, str_to_int, to_checksum_address
 
-db_file_path = "dapp.sqlite"
+db_file_path = os.getenv("DB_FILE_PATH", "dapp.sqlite")
 
 
 def get_connection():
@@ -159,7 +160,7 @@ def get_wallet_endend_streams(
     cursor.execute(
         """
         SELECT * FROM stream
-        WHERE (from_address = ? OR to_address = ?) AND token_address = ? AND start_timestamp + duration <= ? AND accrued = 0
+        WHERE (from_address = ? OR to_address = ?) AND token_address = ? AND start_timestamp + duration <= ? AND accrued = 0 AND swap_id IS NULL
         """,
         (account_address, account_address, token_address, current_timestamp),
     )
@@ -399,6 +400,20 @@ def get_updatable_pairs(connection, wallet_address, token_address, start_timesta
     )
     return cursor.fetchall()
 
+def get_wallet_token_streamed(connection, wallet_address):
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        SELECT DISTINCT token_address
+        FROM stream
+        WHERE from_address = ? OR to_address = ?
+        """,
+        (
+            wallet_address,
+            wallet_address,
+        ),
+    )
+    return cursor.fetchall()
 
 def get_swaps_for_pair_address(connection, pair_address: str, start_timestamp: int):
     cursor = connection.cursor()

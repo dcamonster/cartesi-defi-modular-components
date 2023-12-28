@@ -37,67 +37,75 @@ def hook(connection, token_address, wallet, to_timestamp):
             for swap in swaps
         ]
 
-        streams_to_update = {
-            swap[0]: {"amount": str_to_int(swap[1]), "duration": swap[2]}
-            for swap in swaps
-        }
+        if swaps:
+            streams_to_update = {
+                swap[0]: {"amount": str_to_int(swap[1]), "duration": swap[2]}
+                for swap in swaps
+            }
+            first_timestamp_to_process = (
+                min([swap[4] for swap in swaps])
+                if last_timestamp_processed == 0
+                else last_timestamp_processed
+            )
 
-        for timestamp in range(last_timestamp_processed, to_timestamp + 1):
+            for timestamp in range(first_timestamp_to_process, to_timestamp):
+                def sum_swaps_token(token_address):
+                    return sum(
+                        [
+                            swap[7]
+                            for swap in swaps
+                            if swap[6] == token_address
+                            and swap[4] <= timestamp
+                            and swap[4] + swap[5] > timestamp
+                        ]
+                    )
 
-            def sum_swaps_token(token_address):
-                return sum(
-                    [
-                        swap[7]
-                        for swap in swaps
-                        if swap[6] == token_address
-                        and swap[4] <= timestamp
-                        and swap[4] + swap[5] > timestamp
-                    ]
+                token_0_in_sum = sum_swaps_token(token_0_address)
+                token_1_in_sum = sum_swaps_token(token_1_address)
+
+                amount_out_token_1 = (
+                    get_amount_out(token_0_in_sum, reserve_in, reserve_out)
+                    if token_0_in_sum != 0
+                    else 0
+                )
+                amount_out_token_0 = (
+                    get_amount_out(token_1_in_sum, reserve_out, reserve_in)
+                    if token_1_in_sum != 0
+                    else 0
                 )
 
-            token_0_in_sum = sum_swaps_token(token_0_address)
-            token_1_in_sum = sum_swaps_token(token_1_address)
+                # Check k
+                k_before = reserve_in * reserve_out
+                k_after = (reserve_in + token_0_in_sum - amount_out_token_0) * (
+                    reserve_out + token_1_in_sum - amount_out_token_1
+                )
+                assert k_after >= k_before, "AMM: K"
 
-            amount_out_token_1 = (
-                get_amount_out(token_0_in_sum, reserve_in, reserve_out)
-                if token_0_in_sum != 0
-                else 0
+                # then update swaps
+                for swap in swaps:
+                    if swap[4] > timestamp or swap[4] + swap[5] <= timestamp:
+                        continue
+                    if swap[6] == token_0_address:  # sending token 0 to pair
+                        # payout is in token 1
+                        streams_to_update[swap[0]]["amount"] += (
+                            swap[7] * amount_out_token_1 // token_0_in_sum
+                        )
+                    else:  # sending token 1 to pair
+                        # payout is in token 0
+                        streams_to_update[swap[0]]["amount"] += (
+                            swap[7] * amount_out_token_0 // token_1_in_sum
+                        )
+                    streams_to_update[swap[0]]["duration"] += 1
+
+                reserve_in += token_0_in_sum - amount_out_token_0
+                reserve_out += token_1_in_sum - amount_out_token_1
+
+            update_stream_amount_duration_batch(
+                connection,
+                [
+                    [value["duration"], int_to_str(value["amount"]), key]
+                    for key, value in streams_to_update.items()
+                ],
             )
-            amount_out_token_0 = (
-                get_amount_out(token_1_in_sum, reserve_out, reserve_in)
-                if token_1_in_sum != 0
-                else 0
-            )
 
-            # Check k
-            k_before = reserve_in * reserve_out
-            k_after = (reserve_in + token_0_in_sum - amount_out_token_0) * (
-                reserve_out + token_1_in_sum - amount_out_token_1
-            )
-            assert k_after >= k_before, "AMM: K"
-
-            # then update swaps
-            for swap in swaps:
-                if swap[4] > timestamp or swap[4] + swap[5] <= timestamp:
-                    continue
-                if swap[6] == token_0_address:
-                    streams_to_update[swap[0]]["amount"] += (
-                        swap[7] * amount_out_token_1 // token_0_in_sum
-                    )
-                else:
-                    streams_to_update[swap[0]]["amount"] += (
-                        swap[7] * amount_out_token_0 // token_1_in_sum
-                    )
-                streams_to_update[swap[0]]["duration"] += 1
-
-            reserve_in += token_0_in_sum - amount_out_token_0
-            reserve_out += token_1_in_sum - amount_out_token_1
-
-        update_stream_amount_duration_batch(
-            connection,
-            [
-                [value["duration"], int_to_str(value["amount"]), key]
-                for key, value in streams_to_update.items()
-            ],
-        )
         set_last_timestamp_processed(connection, pair_address, to_timestamp)

@@ -3,6 +3,7 @@ import traceback
 from os import environ
 
 import requests
+from dapp.amm import AMM
 from eth_abi.abi import encode
 
 from dapp.db import get_connection, stream_test
@@ -133,7 +134,45 @@ def handle_action(data, connection):
                 f"Received voucher status {response.status_code} body {response.content}"
             )
         elif payload["method"] == "cancel_stream":
-            token = StreamableToken(connection, payload["args"]["token"])
+            token = StreamableToken(connection, payload["args"]["token"]).cancel_stream(
+                stream_id=int(payload["args"]["stream_id"]),
+                sender=sender,
+                current_timestamp=timestamp,
+            )
+        elif payload["method"] == "add_liquidity":
+            AMM(connection).add_liquidity(
+                token_a=payload["args"]["token_a"],
+                token_b=payload["args"]["token_b"],
+                token_a_desired=int(payload["args"]["token_a_desired"]),
+                token_b_desired=int(payload["args"]["token_b_desired"]),
+                token_a_min=int(payload["args"]["token_a_min"]),
+                token_b_min=int(payload["args"]["token_b_min"]),
+                to=payload["args"]["to"],
+                msg_sender=data["metadata"]["msg_sender"],
+                current_timestamp=int(data["metadata"]["timestamp"]),
+            )
+        elif payload["method"] == "remove_liquidity":
+            AMM(connection).remove_liquidity(
+                token_a=payload["args"]["token_a"],
+                token_b=payload["args"]["token_b"],
+                liquidity=int(payload["args"]["liquidity"]),
+                amount_a_min=int(payload["args"]["amount_a_min"]),
+                amount_b_min=int(payload["args"]["amount_b_min"]),
+                to=payload["args"]["to"],
+                msg_sender=data["metadata"]["msg_sender"],
+                current_timestamp=int(data["metadata"]["timestamp"]),
+            )
+        elif payload["method"] == "swap":
+            AMM(connection).swap_exact_tokens_for_tokens(
+                amount_in=int(payload["args"]["amount_in"]),
+                amount_out_min=int(payload["args"]["amount_out_min"]),
+                path=payload["args"]["path"],
+                start=int(payload["args"]["start"]),
+                duration=int(payload["args"]["duration"]),
+                to=payload["args"]["to"],
+                msg_sender=data["metadata"]["msg_sender"],
+                current_timestamp=int(data["metadata"]["timestamp"]),
+            )
         else:
             return report_error(f"Unknown method {payload['method']}", data["payload"])
 

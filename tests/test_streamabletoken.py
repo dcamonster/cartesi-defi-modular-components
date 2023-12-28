@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
@@ -10,6 +11,7 @@ from tests.utils import calculate_total_supply_token
 
 class TestStreamableToken(unittest.TestCase):
     def setUp(self):
+        os.environ["DB_FILE_PATH"] = "test-dapp.sqlite"
         initialise_db()
         self.connection = get_connection()
         self.mock_post = Mock()
@@ -60,7 +62,9 @@ class TestStreamableToken(unittest.TestCase):
         burn_amount = 500
         self.token.mint(mint_amount, self.sender_address)
         self.token.burn(
-            amount=burn_amount, sender=self.sender_address, current_timestamp=current_timestamp
+            amount=burn_amount,
+            sender=self.sender_address,
+            current_timestamp=current_timestamp,
         )  # Assuming current_timestamp is 100
         balance = self.token.balance_of(self.sender_address, current_timestamp)
         total_supply = self.token.get_stored_total_supply()
@@ -79,7 +83,9 @@ class TestStreamableToken(unittest.TestCase):
         self.token.mint(mint_amount, self.sender_address)
         with self.assertRaises(AssertionError):
             self.token.burn(
-                amount=mint_amount + 1, sender=self.sender_address, current_timestamp=100
+                amount=mint_amount + 1,
+                sender=self.sender_address,
+                current_timestamp=100,
             )
 
     def test_transfer_from(self):
@@ -155,9 +161,7 @@ class TestStreamableToken(unittest.TestCase):
 
         # After the duration, the receiver should have all the tokens and the sender none
         self.assertEqual(
-            self.token.balance_of(
-                self.receiver_address, current_timestamp + duration
-            ),
+            self.token.balance_of(self.receiver_address, current_timestamp + duration),
             amount,
         )
 
@@ -210,7 +214,8 @@ class TestStreamableToken(unittest.TestCase):
                     receiver=self.receiver_address,
                     amount=amount / 2 + 1,  # Send more than the remaining balance
                     duration=duration,
-                    start_timestamp=current_timestamp + 100,  # Start timestamp is in the future
+                    start_timestamp=current_timestamp
+                    + 100,  # Start timestamp is in the future
                     sender=self.sender_address,
                     current_timestamp=current_timestamp,
                 )

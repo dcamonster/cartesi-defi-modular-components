@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
@@ -13,6 +14,7 @@ from tests.utils import calculate_total_supply_token
 
 class TestAmm(unittest.TestCase):
     def setUp(self):
+        os.environ["DB_FILE_PATH"] = "test-dapp.sqlite"
         initialise_db()
         self.connection = get_connection()
         self.mock_post = Mock()
@@ -238,7 +240,6 @@ class TestAmm(unittest.TestCase):
             self.trader_address, self.current_timestamp + swap_duration
         )
 
-        
         assert future_balance_token_two_trader_mod > future_balance_token_two_trader
 
 

@@ -2,7 +2,7 @@ import os
 
 from dapp.db import get_connection
 
-db_file_path = "dapp.sqlite"
+db_file_path = os.getenv("DB_FILE_PATH", "dapp.sqlite")
 
 
 def initialise_db():

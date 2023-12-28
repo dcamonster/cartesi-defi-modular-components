@@ -207,7 +207,7 @@ class AMM:
             StreamableToken(self.connection, path[1]),
         )
 
-        StreamableToken(self.connection, path[0])
+        # StreamableToken(self.connection, path[0])
 
         swap_id = create_swap(
             self.connection,

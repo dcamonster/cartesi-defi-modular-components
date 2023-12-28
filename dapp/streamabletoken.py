@@ -194,7 +194,7 @@ class StreamableToken:
                 duration=duration,
                 amount=amount,
                 token_address=self.get_address(),
-                accrued=False,
+                accrued=False,  # TODO
                 swap_id=swap_id,
             )
         )
