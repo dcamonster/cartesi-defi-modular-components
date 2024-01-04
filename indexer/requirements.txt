@@ -1,0 +1,15 @@
+fastapi
+pymongo
+uvicorn
+pydantic
+requests
+schedule
+ipdb
+eth_abi
+eth_utils
+eth-hash[pycryptodome] == 0.5.2
+python-dotenv
+starlette-graphene3==0.6.0
+graphene==3.3
+uvicorn[standard]
+cachetools

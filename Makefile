@@ -1,5 +1,5 @@
 test:
-	python -m unittest discover -s tests
+	DB_FILE_PATH="test-dapp.sqlite" python -m unittest discover -s tests
 test-watch:
 	find . -name '*.py' | entr -c make test
 build:
@@ -11,7 +11,7 @@ dev-down:
 host:
 	docker compose -f docker-compose.yml -f docker-compose.override.yml -f docker-compose-host.yml up
 host-python:
-	ROLLUP_HTTP_SERVER_URL="http://127.0.0.1:5004" -m dapp.listener
+	ROLLUP_HTTP_SERVER_URL="http://127.0.0.1:5004" python3 -m dapp.listener
 host-python-debug:
 	ROLLUP_HTTP_SERVER_URL="http://127.0.0.1:5004" python3 -m ptvsd --host localhost --port 5678 -m dapp.listener
 host-python-profile-line:

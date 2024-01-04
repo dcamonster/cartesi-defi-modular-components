@@ -13,7 +13,7 @@ from eth_utils import is_hex_address, to_checksum_address, is_checksum_address
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 MINIMUM_LIQUIDITY = 100000
 MAX_INT64 = 2**63 - 1
-USER_FEES = 0  # per 1000
+USER_FEES = 30  # 0.3%
 
 
 # Custom Decoder Classes

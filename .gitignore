@@ -5,4 +5,4 @@ venv
 storage
 listener.py.lprof
 dapp.db
-dapp.sqlite
+*.sqlite
