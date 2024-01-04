@@ -1,7 +1,7 @@
 from typing import Optional
 
 import graphene
-from db import get_all_streams_with_addresses, get_connection, get_swaps
+from db import get_streams, get_connection, get_swaps
 from graphene_types import Address, Balance, Cursor, Stream, StreamableERC20, Swap
 
 
@@ -12,6 +12,8 @@ class Query(graphene.ObjectType):
         to_address=graphene.String(default_value=None),
         accrued=graphene.Boolean(default_value=None),
         token_address=graphene.String(),
+        simulate_future=graphene.Boolean(default_value=False),
+        future_timestamp=graphene.Int(default_value=None),
     )
     all_swaps = graphene.List(
         Swap,
@@ -22,7 +24,7 @@ class Query(graphene.ObjectType):
         simulate_future=graphene.Boolean(default_value=False),
         future_timestamp=graphene.Int(default_value=None),
     )
-        
+
     all_erc20_tokens = graphene.List(
         StreamableERC20,
         pair_token_0_address=graphene.String(),
@@ -41,9 +43,16 @@ class Query(graphene.ObjectType):
         to_address=None,
         accrued=None,
         token_address=None,
+        simulate_future=None,
+        future_timestamp=None,
     ):
-        streams = get_all_streams_with_addresses(
-            from_address, to_address, accrued, token_address
+        streams = get_streams(
+            from_address=from_address,
+            to_address=to_address,
+            accrued=accrued,
+            token_address=token_address,
+            simulate_future=simulate_future,
+            future_timestamp=future_timestamp,
         )
 
         return [
@@ -82,7 +91,7 @@ class Query(graphene.ObjectType):
 
         return [
             Swap(
-                stream_id=row[0],
+                swap_id=row[0],
                 pair_address=row[1],
                 to_pair=Stream(
                     stream_id=row[2],

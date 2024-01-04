@@ -134,7 +134,6 @@ def get_wallet_streams(connection, account_address, token_address) -> List[Strea
 
 def get_max_end_timestamp_for_wallet(connection, account_address):
     create_account_if_not_exists(connection, account_address)
-
     cursor = connection.cursor()
     cursor.execute(
         """
@@ -325,7 +324,9 @@ def set_total_supply(connection, token_address: str, total_supply: int):
     )
 
 
-def set_last_timestamp_processed(connection, pair_address: str, last_timestamp_processed: int):
+def set_last_timestamp_processed(
+    connection, pair_address: str, last_timestamp_processed: int
+):
     cursor = connection.cursor()
     cursor.execute(
         """
@@ -400,6 +401,7 @@ def get_updatable_pairs(connection, wallet_address, token_address, start_timesta
     )
     return cursor.fetchall()
 
+
 def get_wallet_token_streamed(connection, wallet_address):
     cursor = connection.cursor()
     cursor.execute(
@@ -415,7 +417,7 @@ def get_wallet_token_streamed(connection, wallet_address):
     )
     return cursor.fetchall()
 
-def get_swaps_for_pair_address(connection, pair_address: str, start_timestamp: int):
+def get_swaps_for_pair_address(connection, pair_address: str, to_timestamp: int):
     cursor = connection.cursor()
 
     cursor.execute(
@@ -437,14 +439,17 @@ def get_swaps_for_pair_address(connection, pair_address: str, start_timestamp: i
         WHERE 
             s.pair_address = ?
         AND 
-            st_to_pair.start_timestamp <= ? AND st_from_pair.start_timestamp <= ?
+            to_pair_start_timestamp <= ? -- Have started
         AND 
-            st_to_pair.to_address = ? AND st_from_pair.from_address = ?
+            from_pair_duration != to_pair_duration -- Have not been completly processed
+        AND 
+            st_to_pair.to_address = ? AND st_from_pair.from_address = ? -- Match pair address
+        AND
+            to_pair_duration > 0 -- Are not classic swaps
         """,
         (
             pair_address,
-            start_timestamp,
-            start_timestamp,
+            to_timestamp,
             pair_address,
             pair_address,
         ),

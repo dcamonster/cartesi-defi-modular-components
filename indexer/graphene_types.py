@@ -33,7 +33,7 @@ class Stream(graphene.ObjectType):
 
 
 class Swap(graphene.ObjectType):
-    stream_id = graphene.String()
+    swap_id = graphene.String()
     pair_address = graphene.String()
     to_pair = graphene.Field(Stream)
     from_pair = graphene.Field(Stream)

@@ -214,6 +214,7 @@ class TestAmm(unittest.TestCase):
         # Trader starts a swap
         trader_swap_amt = 30 * 10**18
         self.token_one.mint(trader_swap_amt, self.trader_address)
+        # Buy token two with token one
         self.swap(
             trader_swap_amt,
             swap_start_trader,
@@ -226,11 +227,12 @@ class TestAmm(unittest.TestCase):
         )
 
         # Another user trades the same pair in the future affecting the trader's swap at some point
-        random_user_swap_amt = 50 * 10**18
+        random_user_swap_amt = 500 * 10**18
         self.token_two.mint(random_user_swap_amt, self.random_address)
+        # Sell big amount of token two for token one
         self.swap(
             random_user_swap_amt,
-            swap_start_trader + swap_duration // 2,
+            swap_start_trader,
             swap_duration // 2,
             self.random_address,
             path="l",

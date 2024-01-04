@@ -12,3 +12,4 @@ python-dotenv
 starlette-graphene3==0.6.0
 graphene==3.3
 uvicorn[standard]
+cachetools

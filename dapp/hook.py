@@ -42,21 +42,41 @@ def hook(connection, token_address, wallet, to_timestamp):
                 swap[0]: {"amount": str_to_int(swap[1]), "duration": swap[2]}
                 for swap in swaps
             }
-            first_timestamp_to_process = (
-                min([swap[4] for swap in swaps])
-                if last_timestamp_processed == 0
-                else last_timestamp_processed
-            )
 
-            for timestamp in range(first_timestamp_to_process, to_timestamp):
+            points = set()
+            for swap in swaps:
+                if swap[4] + swap[2] <= to_timestamp:
+                    points.add(
+                        swap[4] + swap[2]
+                    )  # payout stream processed until this point
+                if swap[4] + swap[5] <= to_timestamp:
+                    points.add(swap[4] + swap[5])  # swap lasts until this point
+            points.add(to_timestamp)  # last point to process
+
+            timestamps = sorted(list(points))
+            increments = [
+                timestamps[i + 1] - timestamps[i] for i in range(len(timestamps) - 1)
+            ]
+
+            prev_timestamp = timestamps[0]
+            for increment in increments:
+                prev = prev_timestamp
+                prev_timestamp = prev_timestamp + increment
+                timestamp = prev_timestamp
+
+                def is_in_range(swap):
+                    return (
+                        swap[4] <= prev  # has started
+                        and swap[4] + swap[5]
+                        >= timestamp  # has not ended or ends in this increment
+                    )
+
                 def sum_swaps_token(token_address):
                     return sum(
                         [
-                            swap[7]
+                            increment * swap[7]
                             for swap in swaps
-                            if swap[6] == token_address
-                            and swap[4] <= timestamp
-                            and swap[4] + swap[5] > timestamp
+                            if swap[6] == token_address and is_in_range(swap)
                         ]
                     )
 
@@ -82,30 +102,29 @@ def hook(connection, token_address, wallet, to_timestamp):
                 assert k_after >= k_before, "AMM: K"
 
                 # then update swaps
-                for swap in swaps:
-                    if swap[4] > timestamp or swap[4] + swap[5] <= timestamp:
-                        continue
+                for swap in [swap for swap in swaps if is_in_range(swap)]:
                     if swap[6] == token_0_address:  # sending token 0 to pair
                         # payout is in token 1
                         streams_to_update[swap[0]]["amount"] += (
-                            swap[7] * amount_out_token_1 // token_0_in_sum
+                            increment * swap[7] * amount_out_token_1 // token_0_in_sum
                         )
                     else:  # sending token 1 to pair
                         # payout is in token 0
                         streams_to_update[swap[0]]["amount"] += (
-                            swap[7] * amount_out_token_0 // token_1_in_sum
+                            increment * swap[7] * amount_out_token_0 // token_1_in_sum
                         )
-                    streams_to_update[swap[0]]["duration"] += 1
+                    streams_to_update[swap[0]]["duration"] += increment
 
                 reserve_in += token_0_in_sum - amount_out_token_0
                 reserve_out += token_1_in_sum - amount_out_token_1
 
-            update_stream_amount_duration_batch(
-                connection,
-                [
-                    [value["duration"], int_to_str(value["amount"]), key]
-                    for key, value in streams_to_update.items()
-                ],
-            )
+            if increments:
+                update_stream_amount_duration_batch(
+                    connection,
+                    [
+                        [value["duration"], int_to_str(value["amount"]), key]
+                        for key, value in streams_to_update.items()
+                    ],
+                )
 
         set_last_timestamp_processed(connection, pair_address, to_timestamp)

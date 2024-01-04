@@ -63,8 +63,6 @@ class StreamableToken:
         return set_total_supply(self._connection, self._address, amount)
 
     def process_streams(self, account_address: str, current_timestamp: int):
-        hook(self._connection, self._address, account_address, current_timestamp)
-
         ended_streams = self.get_wallet_endend_streams(
             account_address, current_timestamp
         )
@@ -86,6 +84,8 @@ class StreamableToken:
                 )
                 self.set_stored_balance(stream.from_address, balance_from)
         self.set_stored_balance(account_address, balance)
+
+        hook(self._connection, self._address, account_address, current_timestamp)
 
     def mint(self, amount: int, wallet: str):
         address_or_raise(wallet)
@@ -124,7 +124,7 @@ class StreamableToken:
 
     def future_balance_of(self, account_address: str, future_timestamp=None):
         address_or_raise(account_address)
-        self._connection.commit()
+        self._connection.execute("SAVEPOINT future_balance_of")
         try:
             max_timestamp = (
                 future_timestamp
@@ -134,7 +134,8 @@ class StreamableToken:
             hook(self._connection, self._address, account_address, max_timestamp)
             balance = self.balance_of(account_address, max_timestamp)
         finally:
-            self._connection.rollback()
+            self._connection.execute("ROLLBACK TO SAVEPOINT future_balance_of")
+            self._connection.execute("RELEASE SAVEPOINT future_balance_of")
 
         return balance
 
@@ -144,7 +145,7 @@ class StreamableToken:
 
     def future_get_streams(self, account_address: str, future_timestamp=None):
         address_or_raise(account_address)
-        self._connection.commit()
+        self._connection.execute("SAVEPOINT future_get_streams")
         try:
             max_timestamp = (
                 future_timestamp
@@ -154,7 +155,8 @@ class StreamableToken:
             hook(self._connection, self._address, account_address, max_timestamp)
             streams = self.get_streams(account_address)
         finally:
-            self._connection.rollback()
+            self._connection.execute("ROLLBACK TO SAVEPOINT future_get_streams")
+            self._connection.execute("RELEASE SAVEPOINT future_get_streams")
 
         return streams
 

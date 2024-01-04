@@ -207,8 +207,6 @@ class AMM:
             StreamableToken(self.connection, path[1]),
         )
 
-        # StreamableToken(self.connection, path[0])
-
         swap_id = create_swap(
             self.connection,
             pair.get_address(),
@@ -232,7 +230,7 @@ class AMM:
                 current_timestamp=current_timestamp,
                 swap_id=swap_id,
             )
-            token_1.transfer_from(
+            token_1.transfer(
                 receiver=to,
                 amount=amount_out,
                 duration=0,

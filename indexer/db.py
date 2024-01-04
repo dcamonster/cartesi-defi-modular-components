@@ -16,10 +16,14 @@ db_file_path = "../" + os.getenv("DB_FILE_PATH", "dapp.sqlite")
 
 
 def get_connection():
-    conn = sqlite3.connect(db_file_path)
+    # Opening the connection in read-write mode
+    conn = sqlite3.connect(f"file:{db_file_path}?mode=rw", uri=True)
     cursor = conn.cursor()
     cursor.execute("PRAGMA foreign_keys = ON")
-    cursor.execute("PRAGMA journal_mode = WAL")
+
+    # Disable auto-commit mode
+    conn.isolation_level = None
+
     return conn
 
 
@@ -28,47 +32,70 @@ def close_connection(conn):
 
 
 @with_checksum_address
-def get_all_streams_with_addresses(
-    from_address=None, to_address=None, accrued=None, token_address=None
+def get_streams(
+    from_address=None,
+    to_address=None,
+    accrued=None,
+    token_address=None,
+    simulate_future=None,
+    future_timestamp=None,
 ):
     conn = get_connection()
-    where_clause = []
-    params = []
+    conn.execute("SAVEPOINT get_streams")
+    try:
+        if simulate_future:
+            account_address = from_address if from_address else to_address
+            if not account_address:
+                raise Exception("Must provide either from_address or to_address")
+            max_timestamp = (
+                future_timestamp
+                if future_timestamp
+                else get_max_end_timestamp_for_wallet(conn, account_address)
+            )
+            tokens = get_wallet_token_streamed(conn, account_address)
+            for t in tokens:
+                hook(conn, t[0], account_address, max_timestamp)
 
-    if from_address:
-        where_clause.append("s.from_address = ?")
-        params.append(from_address)
+        where_clause = []
+        params = []
 
-    if to_address:
-        where_clause.append("s.to_address = ?")
-        params.append(to_address)
+        if from_address:
+            where_clause.append("s.from_address = ?")
+            params.append(from_address)
 
-    if token_address:
-        where_clause.append("s.token_address = ?")
-        params.append(token_address)
+        if to_address:
+            where_clause.append("s.to_address = ?")
+            params.append(to_address)
 
-    where_sql = " AND ".join(where_clause) if where_clause else "1=1"
+        if token_address:
+            where_clause.append("s.token_address = ?")
+            params.append(token_address)
 
-    cursor = conn.cursor()
-    cursor.execute(
-        f"""
-        SELECT 
-            s.id,
-            s.from_address,
-            s.to_address,
-            s.token_address,
-            s.amount,
-            s.start_timestamp,
-            s.duration,
-            s.accrued,
-            s.swap_id
-        FROM stream s
-        WHERE {where_sql}
-    """,
-        params,
-    )
-    results = cursor.fetchall()
-    conn.close()
+        where_sql = " AND ".join(where_clause) if where_clause else "1=1"
+
+        cursor = conn.cursor()
+        cursor.execute(
+            f"""
+            SELECT 
+                s.id,
+                s.from_address,
+                s.to_address,
+                s.token_address,
+                s.amount,
+                s.start_timestamp,
+                s.duration,
+                s.accrued,
+                s.swap_id
+            FROM stream s
+            WHERE {where_sql}
+        """,
+            params,
+        )
+        results = cursor.fetchall()
+    finally:
+        conn.execute("ROLLBACK TO SAVEPOINT get_streams")
+        conn.execute("RELEASE SAVEPOINT get_streams")
+        conn.close()
 
     return results
 
@@ -83,6 +110,7 @@ def get_swaps(
     simulate_future=None,
 ):
     conn = get_connection()
+    conn.execute("SAVEPOINT get_swaps")
     try:
         if simulate_future:
             account_address = from_address if from_address else to_address
@@ -163,7 +191,8 @@ def get_swaps(
         )
         results = cursor.fetchall()
     finally:
-        conn.rollback()
+        conn.execute("ROLLBACK TO SAVEPOINT get_swaps")
+        conn.execute("RELEASE SAVEPOINT get_swaps")
         conn.close()
 
     return results
