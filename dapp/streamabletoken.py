@@ -108,17 +108,27 @@ class StreamableToken:
         self.set_stored_total_supply(initial_supply - amount)
         return self.set_stored_balance(sender, self.get_stored_balance(sender) - amount)
 
-    def balance_of(self, account_address: str, at_timestamp: int, count_received=True):
+    def balance_of(
+        self,
+        account_address: str,
+        at_timestamp: int,
+        count_received=True,
+        recipient_until_timestamp=0,
+    ):
         address_or_raise(account_address)
         balance = self.get_stored_balance(account_address)
 
         streamed_amounts = get_wallet_non_accrued_streamed_amts(
-            self._connection, account_address, self._address, at_timestamp
+            self._connection,
+            account_address,
+            self._address,
+            at_timestamp,
+            recipient_until_timestamp=at_timestamp
+            if count_received
+            else recipient_until_timestamp,
         )
 
-        balance += sum(
-            streamed for streamed in streamed_amounts if count_received or streamed < 0
-        )
+        balance += sum(streamed for streamed in streamed_amounts)
 
         return balance
 
@@ -180,12 +190,15 @@ class StreamableToken:
         assert sender != receiver, "Sender and receiver must be different."
         assert amount >= 0, "Amount must be positive."
 
-        future_balance_after_send = self.balance_of(
-            sender, start_timestamp + duration, False
+        max_timestamp = max(
+            start_timestamp + duration,
+            get_max_end_timestamp_for_wallet(self._connection, sender),
         )
-        assert (
-            future_balance_after_send >= amount
-        ), "Insufficient future balance to transfer. Check your streams."
+
+        future_balance_after_send = self.balance_of(
+            sender, max_timestamp, False, current_timestamp
+        )
+        assert future_balance_after_send >= amount, "Not enough funds for the transfer."
 
         return self.add_stream(
             Stream(
@@ -196,7 +209,7 @@ class StreamableToken:
                 duration=duration,
                 amount=amount,
                 token_address=self.get_address(),
-                accrued=False,  # TODO
+                accrued=False,
                 swap_id=swap_id,
             )
         )
@@ -208,7 +221,7 @@ class StreamableToken:
         assert stream.from_address == sender, "Sender is not the stream owner."
         assert (
             stream.start_timestamp + stream.duration >= current_timestamp
-        ), "Stream is already sent."
+        ), "Stream is already completed."
 
         if stream.start_timestamp > current_timestamp:
             delete_stream_by_id(self._connection, stream_id)

@@ -82,7 +82,11 @@ def stream_from_row(row) -> Stream:
 
 
 def get_wallet_non_accrued_streamed_amts(
-    connection, account_address, token_address, until_timestamp
+    connection,
+    account_address,
+    token_address,
+    until_timestamp,
+    recipient_until_timestamp=0,
 ):
     create_account_if_not_exists(connection, account_address)
     create_token_if_not_exists(connection, token_address)
@@ -100,16 +104,18 @@ def get_wallet_non_accrued_streamed_amts(
     for row in cursor:
         start_timestamp, duration, amount, to_address = row
         amount = int(amount)
+        is_recipient = to_address == account_address
+        effective_until = recipient_until_timestamp if is_recipient else until_timestamp
 
-        if until_timestamp < start_timestamp:
+        if effective_until < start_timestamp:
             streamed_amount = 0
-        elif until_timestamp >= start_timestamp + duration:
+        elif effective_until >= start_timestamp + duration:
             streamed_amount = amount
         else:
-            elapsed = until_timestamp - start_timestamp
+            elapsed = effective_until - start_timestamp
             streamed_amount = (amount * elapsed) // duration
 
-        yield (streamed_amount if to_address == account_address else -streamed_amount)
+        yield (streamed_amount if is_recipient else -streamed_amount)
 
 
 def get_wallet_streams(connection, account_address, token_address) -> List[Stream]:
@@ -145,9 +151,8 @@ def get_max_end_timestamp_for_wallet(connection, account_address):
     )
 
     result = cursor.fetchone()
-    max_end_timestamp = result[0] if result else 0
 
-    return max_end_timestamp
+    return result[0] if result[0] else 0
 
 
 def get_wallet_endend_streams(
@@ -416,6 +421,7 @@ def get_wallet_token_streamed(connection, wallet_address):
         ),
     )
     return cursor.fetchall()
+
 
 def get_swaps_for_pair_address(connection, pair_address: str, to_timestamp: int):
     cursor = connection.cursor()

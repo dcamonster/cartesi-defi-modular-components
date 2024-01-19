@@ -1,4 +1,4 @@
-from dapp.db import create_swap
+from dapp.db import create_pair_if_not_exists, create_swap
 from dapp.streamabletoken import StreamableToken
 from dapp.util import (
     MINIMUM_LIQUIDITY,
@@ -107,6 +107,12 @@ class AMM:
             pair.mint(
                 MINIMUM_LIQUIDITY, ZERO_ADDRESS
             )  # permanently lock the first MINIMUM_LIQUIDITY tokens
+            create_pair_if_not_exists(
+                self.connection,
+                pair_address,
+                pair.token0.get_address(),
+                pair.token1.get_address(),
+            )
         else:
             liquidity = min(
                 amount_a * total_supply // reserve_a,
@@ -152,7 +158,9 @@ class AMM:
         assert amount_0 >= 0, "AMM: INSUFFICIENT_LIQUIDITY_BURNED"
         assert amount_1 >= 0, "AMM: INSUFFICIENT_LIQUIDITY_BURNED"
 
-        pair.burn(amount=liquidity, sender=pair_address, current_timestamp=current_timestamp)
+        pair.burn(
+            amount=liquidity, sender=pair_address, current_timestamp=current_timestamp
+        )
 
         token_0.transfer(
             receiver=to,

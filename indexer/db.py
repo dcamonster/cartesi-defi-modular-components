@@ -12,7 +12,7 @@ from dapp.hook import hook
 
 from utils import with_checksum_address
 
-db_file_path = "../" + os.getenv("DB_FILE_PATH", "dapp.sqlite")
+db_file_path =  os.getenv("DB_FILE_PATH", "dapp.sqlite")
 
 
 def get_connection():
@@ -29,6 +29,45 @@ def get_connection():
 
 def close_connection(conn):
     conn.close()
+
+
+def create_last_cursor_table():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS last_cursor (
+            id INTEGER PRIMARY KEY,
+            last_cursor_value TEXT
+        )
+    """
+    )
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO last_cursor (id, last_cursor_value) VALUES (1, NULL)
+    """
+    )
+    conn.commit()
+
+
+def get_last_cursor():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT last_cursor_value FROM last_cursor WHERE id = 1")
+    result = cursor.fetchone()
+    return result[0] if result else None
+
+
+def set_last_cursor(cursor_value):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE last_cursor SET last_cursor_value = ? WHERE id = 1
+    """,
+        (cursor_value,),
+    )
+    conn.commit()
 
 
 @with_checksum_address

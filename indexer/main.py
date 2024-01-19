@@ -1,4 +1,12 @@
+import requests
 import graphene
+from db import (
+    create_last_cursor_table,
+    get_connection,
+    get_last_cursor,
+    set_last_cursor,
+)
+from sqlite import initialise_db
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -11,6 +19,17 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette_graphene3 import GraphQLApp, make_graphiql_handler
 from cachetools import TTLCache
 from starlette.types import ASGIApp, Receive, Scope, Send, Message
+
+import sys
+
+sys.path.append("../dapp")
+from dapp.core import handle_action
+from dapp.util import hex_to_str
+
+import schedule
+import time
+import threading
+
 
 import asyncio
 from starlette.concurrency import run_in_threadpool
@@ -111,6 +130,82 @@ schema = graphene.Schema(query=Query)
 app = Starlette(middleware=middleware)
 
 app.mount("/", GraphQLApp(schema, on_get=make_graphiql_handler()))  # Graphiql IDE
+
+
+# Initialise the last cursor tables if it doesn't exist
+create_last_cursor_table()
+
+GRAPHQL_API = "http://localhost:4000/graphql"
+
+
+def run_query():
+    last_cursor = get_last_cursor()
+    print(f"Running query with cursor: {last_cursor}")
+
+    graphql_query = f"""
+        {{
+            reports{f'(after:"{last_cursor}")' if last_cursor else ""} {{
+                edges{{
+                    cursor
+                    node{{
+                        index
+                        payload,
+                        input{{
+                            msgSender
+                            timestamp
+                            payload
+                            blockNumber
+                        }}
+                    }}
+                }}
+            }}
+        }}
+    """
+
+    response = requests.post(GRAPHQL_API, json={"query": graphql_query})
+    data = response.json()
+
+    for edge in data.get("data", {}).get("reports", {}).get("edges", []):
+        node = edge.get("node", {})
+        try:
+            report_payload = hex_to_str(node["payload"])
+            report = json.loads(report_payload)
+            if report["message"] != "Success":
+                continue
+            conn = get_connection()
+            formatted_data = {
+                "payload": node["input"]["payload"],
+                "metadata": {
+                    "msg_sender": node["input"]["msgSender"],
+                    "timestamp": int(node["input"]["timestamp"]),
+                    "block_number": int(node["input"]["blockNumber"]),
+                },
+            }
+            handle_action(formatted_data, conn)
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(e)
+            pass
+        
+        set_last_cursor(edge.get("cursor"))
+
+
+# Schedule the function to run every 3 seconds
+schedule.every(1).seconds.do(run_query)
+
+
+# # Define the job thread
+def job_thread():
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+
+# # Start the job thread
+thread = threading.Thread(target=job_thread)
+thread.daemon = True  # Set the thread as a daemon
+thread.start()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8081)

@@ -179,6 +179,7 @@ class TestStreamableToken(unittest.TestCase):
         self.token.mint(amount, self.sender_address)
 
         # Transfering more than the balance should raise an exception
+        self.connection.execute("SAVEPOINT before_exception")
         with self.assertRaises(Exception) as context:
             try:
                 self.token.transfer(
@@ -191,8 +192,9 @@ class TestStreamableToken(unittest.TestCase):
                 )
             except Exception as e:
                 self.exception = e
-                assert e.args[0] == "Insufficient current balance to transfer"
-                self.connection.rollback()
+                assert e.args[0] == "Insufficient future balance to transfer. Check your streams."
+                self.connection.execute("ROLLBACK TO SAVEPOINT before_exception")
+                self.connection.execute("RELEASE SAVEPOINT before_exception")
                 raise e
 
         # Send half the amount
@@ -208,6 +210,7 @@ class TestStreamableToken(unittest.TestCase):
         # Simulate the passage of half the duration
         current_timestamp += duration / 2
 
+        self.connection.execute("SAVEPOINT before_exception")
         with self.assertRaises(Exception) as context:
             try:
                 self.token.transfer(
@@ -226,7 +229,8 @@ class TestStreamableToken(unittest.TestCase):
                     e.args[0]
                     == "Insufficient future balance to transfer. Check your streams."
                 )
-                self.connection.rollback()
+                self.connection.execute("ROLLBACK TO SAVEPOINT before_exception")
+                self.connection.execute("RELEASE SAVEPOINT before_exception")
                 raise e
 
     def test_stream_with_zero_duration(self):
