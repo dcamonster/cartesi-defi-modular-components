@@ -83,6 +83,7 @@ class StreamableToken:
                     self.get_stored_balance(stream.from_address) - streamed_amount
                 )
                 self.set_stored_balance(stream.from_address, balance_from)
+
         self.set_stored_balance(account_address, balance)
 
         hook(self._connection, self._address, account_address, current_timestamp)
