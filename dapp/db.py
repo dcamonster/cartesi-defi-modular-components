@@ -1,9 +1,10 @@
+import os
 import sqlite3
 from typing import List
 from dapp.stream import Stream
 from dapp.util import int_to_str, str_to_int, to_checksum_address
 
-db_file_path = "dapp.db"
+db_file_path = os.getenv("DB_FILE_PATH", "dapp.sqlite")
 
 
 def get_connection():
@@ -36,53 +37,126 @@ def create_token_if_not_exists(connection, token_address, default_total_supply=0
     )
 
 
+def create_pair_if_not_exists(
+    connection, token_address, token_0_address, token_1_address
+):
+    create_token_if_not_exists(connection, token_address)
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO pair (address, token_0_address, token_1_address)
+        VALUES (?, ?, ?)
+        """,
+        (token_address, token_0_address, token_1_address),
+    )
+    return cursor.lastrowid
+
+
+def create_swap(connection, pair_address, token_0_address, token_1_address):
+    create_pair_if_not_exists(
+        connection, pair_address, token_0_address, token_1_address
+    )
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        INSERT INTO swap (pair_address)
+        VALUES (?)
+        """,
+        (pair_address,),
+    )
+    return cursor.lastrowid
+
+
 def stream_from_row(row) -> Stream:
     return Stream(
         stream_id=row[0],
         from_address=row[1],
         to_address=row[2],
-        start_block=row[3],
-        block_duration=row[4],
+        start_timestamp=row[3],
+        duration=row[4],
         amount=str_to_int(row[5]),
         token_address=row[6],
         accrued=True if row[7] == 1 else False,
-        pair_address=row[8] if len(row) > 8 else None,
+        swap_id=row[8] if len(row) > 8 else None,
     )
 
 
 def get_wallet_non_accrued_streamed_amts(
-    connection, account_address, token_address, until_block
+    connection,
+    account_address,
+    token_address,
+    until_timestamp,
+    recipient_until_timestamp=0,
 ):
     create_account_if_not_exists(connection, account_address)
     create_token_if_not_exists(connection, token_address)
     cursor = connection.cursor()
     cursor.execute(
         """
-        SELECT start_block, block_duration, amount, to_address
+        SELECT start_timestamp, duration, amount, to_address
         FROM stream
         WHERE (from_address = ? OR to_address = ?) AND token_address = ? AND accrued = 0
-        AND start_block <= ?
+        AND start_timestamp <= ?
         """,
-        (account_address, account_address, token_address, until_block),
+        (account_address, account_address, token_address, until_timestamp),
     )
 
     for row in cursor:
-        start_block, block_duration, amount, to_address = row
+        start_timestamp, duration, amount, to_address = row
         amount = int(amount)
+        is_recipient = to_address == account_address
+        effective_until = recipient_until_timestamp if is_recipient else until_timestamp
 
-        if until_block < start_block:
+        if effective_until < start_timestamp:
             streamed_amount = 0
-        elif until_block >= start_block + block_duration:
+        elif effective_until >= start_timestamp + duration:
             streamed_amount = amount
         else:
-            elapsed = until_block - start_block
-            streamed_amount = (amount * elapsed) // block_duration
+            elapsed = effective_until - start_timestamp
+            streamed_amount = (amount * elapsed) // duration
 
-        yield (streamed_amount if to_address == account_address else -streamed_amount)
+        yield (streamed_amount if is_recipient else -streamed_amount)
+
+
+def get_wallet_streams(connection, account_address, token_address) -> List[Stream]:
+    create_account_if_not_exists(connection, account_address)
+    create_token_if_not_exists(connection, token_address)
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        SELECT * FROM stream
+        WHERE (from_address = ? OR to_address = ?) AND token_address = ?
+        """,
+        (account_address, account_address, token_address),
+    )
+    rows = cursor.fetchall()
+
+    streams = []
+    for row in rows:
+        streams.append(stream_from_row(row))
+
+    return streams
+
+
+def get_max_end_timestamp_for_wallet(connection, account_address):
+    create_account_if_not_exists(connection, account_address)
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        SELECT MAX(start_timestamp + duration)
+        FROM stream
+        WHERE (from_address = ? OR to_address = ?)
+        """,
+        (account_address, account_address),
+    )
+
+    result = cursor.fetchone()
+
+    return result[0] if result[0] else 0
 
 
 def get_wallet_endend_streams(
-    connection, account_address, token_address, current_block
+    connection, account_address, token_address, current_timestamp
 ) -> List[Stream]:
     create_account_if_not_exists(connection, account_address)
     create_token_if_not_exists(connection, token_address)
@@ -90,9 +164,9 @@ def get_wallet_endend_streams(
     cursor.execute(
         """
         SELECT * FROM stream
-        WHERE (from_address = ? OR to_address = ?) AND token_address = ? AND start_block + block_duration <= ? AND accrued = 0
+        WHERE (from_address = ? OR to_address = ?) AND token_address = ? AND start_timestamp + duration <= ? AND accrued = 0 AND swap_id IS NULL
         """,
-        (account_address, account_address, token_address, current_block),
+        (account_address, account_address, token_address, current_timestamp),
     )
     rows = cursor.fetchall()
 
@@ -155,39 +229,52 @@ def add_stream(connection, stream) -> int:
     create_account_if_not_exists(connection, stream.from_address)
     create_account_if_not_exists(connection, stream.to_address)
     create_token_if_not_exists(connection, stream.token_address)
-    if stream.pair_address is not None:
-        create_token_if_not_exists(connection, stream.pair_address)
+    # if stream.pair_address is not None:
+    #     create_token_if_not_exists(connection, stream.pair_address)
     cursor = connection.cursor()
     cursor.execute(
         """
-        INSERT INTO stream (from_address, to_address, start_block, block_duration, amount, token_address, accrued, pair_address)
+        INSERT INTO stream (from_address, to_address, start_timestamp, duration, amount, token_address, accrued, swap_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             stream.from_address,
             stream.to_address,
-            stream.start_block,
-            stream.block_duration,
+            stream.start_timestamp,
+            stream.duration,
             int_to_str(stream.amount),
             stream.token_address,
             1 if stream.accrued else 0,
-            stream.pair_address,
+            stream.swap_id,
         ),
     )
 
     return cursor.lastrowid
 
 
-def update_stream_amount_duration(connection, stream_id, block_duration, amount):
+def update_stream_amount_duration(connection, stream_id, duration, amount):
     cursor = connection.cursor()
     cursor.execute(
         """
         UPDATE stream
-        SET block_duration = ?, amount = ?
+        SET duration = ?, amount = ?
         WHERE id = ?
         """,
-        (block_duration, int_to_str(amount), stream_id),
+        (duration, int_to_str(amount), stream_id),
     )
+
+
+def update_stream_amount_duration_batch(connection, stream_durations_amounts_ids):
+    cursor = connection.cursor()
+    cursor.executemany(
+        """
+        UPDATE stream
+        SET duration = ?, amount = ?
+        WHERE id = ?
+        """,
+        stream_durations_amounts_ids,
+    )
+    return cursor.lastrowid
 
 
 def update_stream_accrued(connection, stream_id, accrued):
@@ -242,8 +329,25 @@ def set_total_supply(connection, token_address: str, total_supply: int):
     )
 
 
+def set_last_timestamp_processed(
+    connection, pair_address: str, last_timestamp_processed: int
+):
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        UPDATE pair
+        SET last_timestamp_processed = ?
+        WHERE address = ?
+        """,
+        (
+            last_timestamp_processed,
+            pair_address,
+        ),
+    )
+
+
 # Test only
-def stream_test(payload, sender, block_number, connection):
+def stream_test(payload, sender, start_timestamp, connection):
     split_number = int(payload["args"]["split_number"])
     split_amount = int(payload["args"]["amount"]) // split_number
 
@@ -262,7 +366,7 @@ def stream_test(payload, sender, block_number, connection):
             (
                 sender_checksum,
                 receiver_checksum,
-                block_number,
+                start_timestamp,
                 duration + number,
                 amt,
                 token_checksum,
@@ -274,8 +378,87 @@ def stream_test(payload, sender, block_number, connection):
     cursor = connection.cursor()
     cursor.executemany(
         """
-                INSERT INTO stream (from_address, to_address, start_block, block_duration, amount, token_address, accrued, pair_address)
+                INSERT INTO stream (from_address, to_address, start_timestamp, duration, amount, token_address, accrued, swap_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
         stream_data,
     )
+
+
+def get_updatable_pairs(connection, wallet_address, token_address, start_timestamp):
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        SELECT DISTINCT s.pair_address, p.token_0_address, p.token_1_address, p.last_timestamp_processed
+        FROM swap s
+        JOIN stream st ON s.id = st.swap_id
+        JOIN pair p ON s.pair_address = p.address
+        WHERE st.to_address = ? AND st.accrued = 0 
+        AND p.token_0_address == ? OR p.token_1_address == ?
+        AND st.start_timestamp <= ?
+        """,
+        (
+            wallet_address,
+            token_address,
+            token_address,
+            start_timestamp,
+        ),
+    )
+    return cursor.fetchall()
+
+
+def get_wallet_token_streamed(connection, wallet_address):
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        SELECT DISTINCT token_address
+        FROM stream
+        WHERE from_address = ? OR to_address = ?
+        """,
+        (
+            wallet_address,
+            wallet_address,
+        ),
+    )
+    return cursor.fetchall()
+
+
+def get_swaps_for_pair_address(connection, pair_address: str, to_timestamp: int):
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT 
+            st_from_pair.id AS from_pair_id,
+            st_from_pair.amount AS from_pair_amount,
+            st_from_pair.duration AS from_pair_duration,
+            st_to_pair.amount AS to_pair_amount, 
+            st_to_pair.start_timestamp AS to_pair_start_timestamp,
+            st_to_pair.duration AS to_pair_duration,
+            st_to_pair.token_address AS to_pair_token_address
+        FROM 
+            swap s
+        JOIN 
+            stream st_to_pair ON s.id = st_to_pair.swap_id
+        JOIN 
+            stream st_from_pair ON s.id = st_from_pair.swap_id
+        WHERE 
+            s.pair_address = ?
+        AND 
+            to_pair_start_timestamp <= ? -- Have started
+        AND 
+            from_pair_duration != to_pair_duration -- Have not been completly processed
+        AND 
+            st_to_pair.to_address = ? AND st_from_pair.from_address = ? -- Match pair address
+        AND
+            to_pair_duration > 0 -- Are not classic swaps
+        """,
+        (
+            pair_address,
+            to_timestamp,
+            pair_address,
+            pair_address,
+        ),
+    )
+
+    return cursor.fetchall()

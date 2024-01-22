@@ -1,5 +1,6 @@
 import json
 import logging
+import hashlib
 from os import environ
 
 # External libraries
@@ -10,6 +11,10 @@ from eth_utils import is_hex_address, to_checksum_address, is_checksum_address
 
 # Constants
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+MINIMUM_LIQUIDITY = 100000
+MAX_INT64 = 2**63 - 1
+MAX_UINT256 = 2**256 - 1
+USER_FEES = 30  # 0.3%
 
 
 # Custom Decoder Classes
@@ -79,14 +84,12 @@ def with_checksum_address(func):
 
 def process_streams_before(func):
     def wrapper(self, *args, **kwargs):
-        if "current_block" in kwargs and "sender" in kwargs:
-            current_block = kwargs["current_block"]
-            sender = kwargs["sender"]
-        else:
-            current_block = args[-1]
-            sender = args[-2]
+        if not "current_timestamp" in kwargs or not "sender" in kwargs:
+            raise ValueError("current_timestamp and sender must be provided.")
+        current_timestamp = kwargs["current_timestamp"]
+        sender = kwargs["sender"]
 
-        self.process_streams(sender, current_block)
+        self.process_streams(sender, current_timestamp)
 
         return func(self, *args, **kwargs)
 
@@ -131,3 +134,51 @@ def address_or_raise(address):
     if not is_checksum_address(address):
         raise ValueError(f"Invalid address {address}")
     return address
+
+
+# Amm
+def addresses_to_hex(address1, address2):
+    address1, address2 = to_checksum_address(address1), to_checksum_address(address2)
+    concatenated_addresses = address1 + address2
+    sha256_hash = hashlib.sha256(concatenated_addresses.encode()).digest()
+    ethereum_address = "0x" + sha256_hash[-20:].hex()
+    return ethereum_address
+
+
+def sort_tokens(token0: str, token1: str):
+    token0, token1 = to_checksum_address(token0), to_checksum_address(token1)
+    return (token0, token1) if token0 < token1 else (token1, token0)
+
+
+def get_pair_address(token0, token1):
+    token0, token1 = to_checksum_address(token0), to_checksum_address(token1)
+    sorted_tokens = sort_tokens(token0, token1)
+    return to_checksum_address(addresses_to_hex(sorted_tokens[0], sorted_tokens[1]))
+
+
+def quote(amount_a: int, reserve_a: int, reserve_b: int):
+    assert amount_a > 0, "AmmLibrary: INSUFFICIENT_AMOUNT"
+    assert reserve_a > 0 and reserve_b > 0, "AmmLibrary: INSUFFICIENT_LIQUIDITY"
+
+    return int((amount_a * reserve_b) // reserve_a)
+
+
+def get_amount_out(amount_in, reserve_in, reserve_out):
+    if amount_in <= 0:
+        raise ValueError("AMM: INSUFFICIENT_INPUT_AMOUNT")
+    if reserve_in <= 0 or reserve_out <= 0:
+        raise ValueError("AMM: INSUFFICIENT_LIQUIDITY")
+
+    amount_in_with_fee = amount_in * (1000 - USER_FEES)
+    numerator = amount_in_with_fee * reserve_out
+    denominator = reserve_in * 1000 + amount_in_with_fee
+    amount_out = numerator // denominator
+
+    return int(amount_out)
+
+def get_portal_address():
+    network = environ.get("NETWORK", "localhost")
+    ERC20PortalFilePath = environ.get("ERC20_PORTAL_FILE_PATH", f"./deployments/{network}/ERC20Portal.json")
+    ERC20PortalFile = open(ERC20PortalFilePath)
+    erc20Portal = json.load(ERC20PortalFile)
+    return erc20Portal["address"]

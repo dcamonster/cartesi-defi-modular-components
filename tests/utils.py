@@ -1,5 +1,5 @@
 from dapp.streamabletoken import StreamableToken
-from dapp.util import with_checksum_address, ZERO_ADDRESS
+from dapp.util import with_checksum_address
 
 
 def get_unique_addresses_for_token(connection, token_address):
@@ -34,7 +34,7 @@ def calculate_total_supply_token(connection, token_address):
     addresses = get_unique_addresses_for_token(connection, token_address)
     token = StreamableToken(connection, token_address)
     total_supply = 0
-    for wallet in [address for address in addresses if address != ZERO_ADDRESS]:
+    for wallet in [address for address in addresses]:
         balance = token.balance_of(wallet, 2**63 - 1)
         assert balance >= 0, "Balance cannot be negative."
         total_supply += balance
