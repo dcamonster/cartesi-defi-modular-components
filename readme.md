@@ -164,6 +164,18 @@ Then run the cartesi rollup stack:
 make dev
 ```
 
+**Building for RISC-V Architecture on Linux**
+
+To build Docker images for the RISC-V architecture (`linux/riscv64`) on Linux, you need to prepare your environment for cross-platform builds. Start by running:
+
+`docker run --rm --privileged multiarch/qemu-user-static --reset -p yes` 
+
+This command sets up QEMU user-mode emulation, enabling Docker to emulate the RISC-V architecture, which is crucial for building and running containers across different platforms.
+
+If you face build issues or wish to optimize Docker, consider running `docker builder prune -a` periodically:
+
+This clears unused build cache, solving potential issues from outdated or corrupt layers and freeing disk space. Note that this action will remove all cached layers and may increase subsequent build times, as Docker recreates these layers.
+
 ## Testing
 
 Run unit tests using `python -m unittest discover -s tests`. Continuous testing can be achieved with `find . -name '*.py' | entr -c make test`.

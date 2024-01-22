@@ -38,7 +38,6 @@ class Swap(graphene.ObjectType):
     to_pair = graphene.Field(Stream)
     from_pair = graphene.Field(Stream)
 
-
 class Cursor(graphene.ObjectType):
     cursor_id = graphene.Int()
     cursor = graphene.String()

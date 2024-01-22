@@ -132,6 +132,7 @@ class StreamableToken:
 
         return balance
 
+    # Only used in the indexer and never during dapp execution
     def future_balance_of(self, account_address: str, future_timestamp=None):
         address_or_raise(account_address)
         self._connection.execute("SAVEPOINT future_balance_of")
@@ -153,6 +154,7 @@ class StreamableToken:
         address_or_raise(account_address)
         return get_wallet_streams(self._connection, account_address, self._address)
 
+    # Only used in the indexer and never during dapp execution
     def future_get_streams(self, account_address: str, future_timestamp=None):
         address_or_raise(account_address)
         self._connection.execute("SAVEPOINT future_get_streams")
