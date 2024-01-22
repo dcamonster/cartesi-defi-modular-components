@@ -1,9 +1,10 @@
+import os
 import sqlite3
 from typing import List
 from dapp.stream import Stream
 from dapp.util import int_to_str, str_to_int, to_checksum_address
 
-db_file_path = "dapp.sqlite"
+db_file_path = os.getenv("DB_FILE_PATH", "dapp.sqlite")
 
 
 def get_connection():
@@ -81,7 +82,11 @@ def stream_from_row(row) -> Stream:
 
 
 def get_wallet_non_accrued_streamed_amts(
-    connection, account_address, token_address, until_timestamp
+    connection,
+    account_address,
+    token_address,
+    until_timestamp,
+    recipient_until_timestamp=0,
 ):
     create_account_if_not_exists(connection, account_address)
     create_token_if_not_exists(connection, token_address)
@@ -99,16 +104,18 @@ def get_wallet_non_accrued_streamed_amts(
     for row in cursor:
         start_timestamp, duration, amount, to_address = row
         amount = int(amount)
+        is_recipient = to_address == account_address
+        effective_until = recipient_until_timestamp if is_recipient else until_timestamp
 
-        if until_timestamp < start_timestamp:
+        if effective_until < start_timestamp:
             streamed_amount = 0
-        elif until_timestamp >= start_timestamp + duration:
+        elif effective_until >= start_timestamp + duration:
             streamed_amount = amount
         else:
-            elapsed = until_timestamp - start_timestamp
+            elapsed = effective_until - start_timestamp
             streamed_amount = (amount * elapsed) // duration
 
-        yield (streamed_amount if to_address == account_address else -streamed_amount)
+        yield (streamed_amount if is_recipient else -streamed_amount)
 
 
 def get_wallet_streams(connection, account_address, token_address) -> List[Stream]:
@@ -133,7 +140,6 @@ def get_wallet_streams(connection, account_address, token_address) -> List[Strea
 
 def get_max_end_timestamp_for_wallet(connection, account_address):
     create_account_if_not_exists(connection, account_address)
-
     cursor = connection.cursor()
     cursor.execute(
         """
@@ -145,9 +151,8 @@ def get_max_end_timestamp_for_wallet(connection, account_address):
     )
 
     result = cursor.fetchone()
-    max_end_timestamp = result[0] if result else 0
 
-    return max_end_timestamp
+    return result[0] if result[0] else 0
 
 
 def get_wallet_endend_streams(
@@ -159,7 +164,7 @@ def get_wallet_endend_streams(
     cursor.execute(
         """
         SELECT * FROM stream
-        WHERE (from_address = ? OR to_address = ?) AND token_address = ? AND start_timestamp + duration <= ? AND accrued = 0
+        WHERE (from_address = ? OR to_address = ?) AND token_address = ? AND start_timestamp + duration <= ? AND accrued = 0 AND swap_id IS NULL
         """,
         (account_address, account_address, token_address, current_timestamp),
     )
@@ -324,7 +329,9 @@ def set_total_supply(connection, token_address: str, total_supply: int):
     )
 
 
-def set_last_timestamp_processed(connection, pair_address: str, last_timestamp_processed: int):
+def set_last_timestamp_processed(
+    connection, pair_address: str, last_timestamp_processed: int
+):
     cursor = connection.cursor()
     cursor.execute(
         """
@@ -400,7 +407,23 @@ def get_updatable_pairs(connection, wallet_address, token_address, start_timesta
     return cursor.fetchall()
 
 
-def get_swaps_for_pair_address(connection, pair_address: str, start_timestamp: int):
+def get_wallet_token_streamed(connection, wallet_address):
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        SELECT DISTINCT token_address
+        FROM stream
+        WHERE from_address = ? OR to_address = ?
+        """,
+        (
+            wallet_address,
+            wallet_address,
+        ),
+    )
+    return cursor.fetchall()
+
+
+def get_swaps_for_pair_address(connection, pair_address: str, to_timestamp: int):
     cursor = connection.cursor()
 
     cursor.execute(
@@ -422,14 +445,17 @@ def get_swaps_for_pair_address(connection, pair_address: str, start_timestamp: i
         WHERE 
             s.pair_address = ?
         AND 
-            st_to_pair.start_timestamp <= ? AND st_from_pair.start_timestamp <= ?
+            to_pair_start_timestamp <= ? -- Have started
         AND 
-            st_to_pair.to_address = ? AND st_from_pair.from_address = ?
+            from_pair_duration != to_pair_duration -- Have not been completly processed
+        AND 
+            st_to_pair.to_address = ? AND st_from_pair.from_address = ? -- Match pair address
+        AND
+            to_pair_duration > 0 -- Are not classic swaps
         """,
         (
             pair_address,
-            start_timestamp,
-            start_timestamp,
+            to_timestamp,
             pair_address,
             pair_address,
         ),

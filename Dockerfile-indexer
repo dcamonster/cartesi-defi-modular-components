@@ -1,0 +1,25 @@
+FROM python:3.9
+
+RUN apt-get update && apt-get install -y make
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+WORKDIR /app
+
+COPY ./indexer/requirements.txt /app/
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+RUN ls
+COPY ./deployments /deployments
+COPY ./dapp /dapp
+COPY ./sqlite.py /sqlite.py
+COPY ./indexer/*.py /app/
+COPY ./indexer/Makefile /app/
+
+EXPOSE 8081
+
+RUN make init-db
+
+ENTRYPOINT ["make", "run-sepolia"]

@@ -5,4 +5,5 @@ venv
 storage
 listener.py.lprof
 dapp.db
-dapp.sqlite
+*.sqlite*
+.ipynb_checkpoints

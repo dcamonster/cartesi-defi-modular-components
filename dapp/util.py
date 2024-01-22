@@ -13,7 +13,8 @@ from eth_utils import is_hex_address, to_checksum_address, is_checksum_address
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 MINIMUM_LIQUIDITY = 100000
 MAX_INT64 = 2**63 - 1
-USER_FEES = 0  # per 1000
+MAX_UINT256 = 2**256 - 1
+USER_FEES = 30  # 0.3%
 
 
 # Custom Decoder Classes
@@ -174,3 +175,10 @@ def get_amount_out(amount_in, reserve_in, reserve_out):
     amount_out = numerator // denominator
 
     return int(amount_out)
+
+def get_portal_address():
+    network = environ.get("NETWORK", "localhost")
+    ERC20PortalFilePath = environ.get("ERC20_PORTAL_FILE_PATH", f"./deployments/{network}/ERC20Portal.json")
+    ERC20PortalFile = open(ERC20PortalFilePath)
+    erc20Portal = json.load(ERC20PortalFile)
+    return erc20Portal["address"]
